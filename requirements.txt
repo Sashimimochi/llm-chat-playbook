@@ -1,0 +1,14 @@
+langchain==0.1.4
+langchain-core==0.1.17
+huggingface-hub==0.20.3
+safetensors==0.4.2
+sentence-transformers==2.3.0
+transformers==4.37.2
+sentencepiece==0.1.99
+tokenizers==0.15.1
+jagger
+tika
+stqdm
+llama-cpp-python==0.2.36
+streamlit==1.31.1
+faiss-cpu

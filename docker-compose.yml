@@ -1,0 +1,14 @@
+version: "3"
+services:
+  calm2:
+    build: .
+    container_name: "calm2"
+    command: ["streamlit", "run", "app.py"]
+    tty: true
+    environment:
+      TZ: Asia/Tokyo
+    volumes:
+      - ".:/projects"
+    working_dir: /projects
+    ports:
+      - 8501:8501
