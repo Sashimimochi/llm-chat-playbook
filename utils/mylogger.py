@@ -1,6 +1,8 @@
+import os
 from logging import getLogger, handlers, Formatter, INFO
 
 def set_logger():
+    os.makedirs("./logs", exist_ok=True)
     root_logger = getLogger()
     root_logger.setLevel(INFO)
     rotating_handler = handlers.RotatingFileHandler(

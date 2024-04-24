@@ -19,7 +19,7 @@ tika.initVM()
 
 @st.cache_resource
 def load_embedding_model():
-	model_name = "pkshatech/GLuCoSE-base-ja"
+	model_name = "intfloat/multilingual-e5-base"
 	embeddings = HuggingFaceEmbeddings(model_name=model_name)
 	return embeddings
 
@@ -60,14 +60,25 @@ def clean_text(text):
 	_text = remove_url(text)
 	return remove_consecutive_newlines(_text)
 
-def convert_to_jira_url(url):
-	pass
-
-def create_index():
-	logger.info("Creating index...")
+def create_index_from_text(data_dir="./data"):
 	docs = []
-	logger.info("Creating index from files...")
-	for filepath in stqdm(get_file_list("./data", "pdf")):
+	for filepath in stqdm(get_file_list(data_dir, "txt")):
+		with open(filepath) as f:
+			doc = clean_text(f.read())
+		docs.append(
+			Document(
+				page_content=doc,
+				metadata=dict(
+					url=filepath,
+					kw=tokenize(doc)
+				)
+			)
+		)
+	return docs
+
+def create_index_from_pdf(data_dir="./data"):
+	docs = []
+	for filepath in stqdm(get_file_list(data_dir, "pdf")):
 		logger.info(f"indexing: {filepath}")
 		doc = clean_text(extract(filepath).get("content"))
 		docs.append(
@@ -80,17 +91,28 @@ def create_index():
 			)
 		)
 	logger.info("Finish convert rich text to normal text")
-	logger.debug(docs)
+	return docs
+
+def create_index():
+	logger.info("Creating index...")
+	docs = []
+	docs += create_index_from_text()
+	docs += create_index_from_pdf()
+	logger.info("Creating index from files...")
 	create_faiss_index(docs)
 
-def create_faiss_index(docs):
+def create_faiss_index(docs, output_dir="./vector_store"):
 	vector_store = FAISS.from_documents(
 		docs,
 		embeddings
 	)
-	vector_store.save_local("./vector_store")
+	vector_store.save_local(output_dir)
+	st.metric("Indexed Docs", len(docs))
 	st.success("Create index successfully")
 
-def load_index():
-	vector_store = FAISS.load_local("./vector_store", embeddings)
+def load_index(input_dir="./vector_store"):
+	if not os.path.exists(input_dir):
+		st.warning("index data not found")
+		return None
+	vector_store = FAISS.load_local(input_dir, embeddings)
 	return vector_store

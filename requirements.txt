@@ -9,6 +9,6 @@ tokenizers==0.15.1
 jagger
 tika
 stqdm
-llama-cpp-python==0.2.36
+llama-cpp-python==0.2.63
 streamlit==1.31.1
 faiss-cpu

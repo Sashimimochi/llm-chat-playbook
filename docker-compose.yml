@@ -1,8 +1,8 @@
 version: "3"
 services:
-  calm2:
+  llm:
     build: .
-    container_name: "calm2"
+    container_name: "llm"
     command: ["streamlit", "run", "app.py"]
     tty: true
     environment:

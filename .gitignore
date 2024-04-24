@@ -1,4 +1,5 @@
-data/
+data/*
+!data/cities.json
 model/
 logs/
 vector_store/
