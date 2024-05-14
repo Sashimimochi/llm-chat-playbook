@@ -1,21 +1,50 @@
-import os
 import glob
-import re
 import jagger
+import json
+import os
+import re
+
 import streamlit as st
+from stqdm import stqdm
 
 import tika
 from tika import parser
+
+from hojichar.core.filter_interface import Filter
+from hojichar import Compose, document_filters
 
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.docstore.document import Document
 from utils.mylogger import getLogger, set_logger
-from stqdm import stqdm
 
 set_logger()
 logger = getLogger(__file__)
 tika.initVM()
+
+class URLFilter(Filter):
+  def apply(self, document):
+    text = document.text
+    text = re.sub(r"https?://\S+", "", text)
+    document.text = text
+    return document
+
+class NewlineFilter(Filter):
+  def apply(self, document):
+    text = document.text
+    # 1つ以上の連続した改行を表す正規表現
+    regex = r"\n+"
+    # 単一の改行
+    replacement = "\n"
+    # 引数3の文字列を対象に引数1を引数2で置き換える
+    text = re.sub(regex, replacement, text)
+    document.text = text
+    return document
+
+cleaner = Compose([
+    URLFilter(),
+    NewlineFilter()
+])
 
 @st.cache_resource
 def load_embedding_model():
@@ -93,11 +122,31 @@ def create_index_from_pdf(data_dir="./data"):
 	logger.info("Finish convert rich text to normal text")
 	return docs
 
+def create_index_from_json(filepath="data/data.jsonl"):
+	with open(filepath) as f:
+		data = [json.loads(line) for line in f.readlines()][:5000]
+	docs = []
+	for d in data:
+		doc = cleaner(d["Answer"])
+		docs.append(
+			Document(
+				page_content=doc,
+				metadata=dict(
+					question=d["Question"],
+					url=d["url"],
+					copyright=d["copyright"],
+					kw=tokenize(doc)
+				)
+			)
+		)
+	return docs
+
 def create_index():
 	logger.info("Creating index...")
 	docs = []
 	docs += create_index_from_text()
 	docs += create_index_from_pdf()
+	docs += create_index_from_json()
 	logger.info("Creating index from files...")
 	create_faiss_index(docs)
 

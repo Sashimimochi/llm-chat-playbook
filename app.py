@@ -1,4 +1,5 @@
 import json
+import os
 import requests
 import streamlit as st
 from utils.mylogger import getLogger, set_logger
@@ -9,6 +10,8 @@ logger = getLogger(__file__)
 
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
+
+MODEL_DIR="./model"
 
 MODEL_LIST = {
     "Calm2": {
@@ -32,7 +35,7 @@ class LLM:
     def __init__(
         self,
         search_type = "similarity_score_threshold",
-        score_threshold = 0.7,
+        score_threshold = 0.8,
         window_size = 10
     ):
         self.MAX_TOKENS = 2048
@@ -64,8 +67,8 @@ class LLM:
         return res[:top_k] if len(res) > 0 else context_docs[:top_k]
 
     def load_model(self, model_name):
-        local_path = MODEL_LIST[model_name].get("local_path")
-        if local_path:
+        local_path = os.path.join(MODEL_DIR, MODEL_LIST[model_name].get("filename"))
+        if os.path.exists(local_path):
             return self.load_model_from_local(local_path)
         else:
             return self.load_model_from_remote(model_name)

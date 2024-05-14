@@ -3,7 +3,7 @@ services:
   llm:
     build: .
     container_name: "llm"
-    command: ["streamlit", "run", "app.py"]
+    command: ["streamlit", "run", "app.py", "--server.port=8503"]
     tty: true
     environment:
       TZ: Asia/Tokyo
@@ -11,4 +11,4 @@ services:
       - ".:/projects"
     working_dir: /projects
     ports:
-      - 8501:8501
+      - 8503:8503
