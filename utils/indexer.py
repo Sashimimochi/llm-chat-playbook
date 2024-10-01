@@ -114,7 +114,7 @@ def create_index_from_pdf(data_dir="./data"):
 			Document(
 				page_content=doc,
 				metadata=dict(
-					url=convert_to_jira_url(os.path.basename(filepath)),
+					url=filepath,
 					kw=tokenize(doc)
 				)
 			)
