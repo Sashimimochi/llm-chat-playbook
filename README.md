@@ -1,6 +1,6 @@
 # LLM Chat Playbook
 
-ローカル LLM を使って各種機能を試すサンプルコード
+ローカルLLMを使って各種機能を試すサンプルコード
 
 ## Quick Start
 
@@ -9,7 +9,7 @@ $ sh setup.sh
 $ docker-compose up -d
 ```
 
-open http://localhost:8501
+open http://localhost:8503
 
 ## Multi Turn Chat
 
@@ -19,7 +19,7 @@ open http://localhost:8501
 
 ## RAG
 
-参考情報を 1 以上にしてチャットを打つと、閾値以上の類似度のドキュメントがあれば、そのテキストを参照して回答を生成する。
+参考情報を1以上にしてチャットを打つと、閾値以上の類似度のドキュメントがあれば、そのテキストを参照して回答を生成する。
 
 ![](./images/rag.png)
 
@@ -33,7 +33,7 @@ data/
 └── easyeasy.txt
 ```
 
-Create Index ボタンを押す。
+Create Indexボタンを押す。
 しばらく待つとインデックスデータが作成される。
 
 ![](./images/create_index.png)
@@ -42,8 +42,8 @@ Create Index ボタンを押す。
 
 ## Function Calling
 
-Model タイプで FunctionCalling を選択すると外部 API を呼んで回答を生成する。
-本サンプルコードでは天気 API を参照して、指定した地域の天気を回答する。
+ModelタイプでFunctionCallingを選択すると外部APIを呼んで回答を生成する。
+本サンプルコードでは天気APIを参照して、指定した地域の天気を回答する。
 
 ![](./images/function_calling.png)
 
