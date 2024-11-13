@@ -126,7 +126,7 @@ def create_index_from_json(filepath="data/data.jsonl"):
 	with open(filepath) as f:
 		data = [json.loads(line) for line in f.readlines()][:5000]
 	docs = []
-	for d in data:
+	for d in stqdm(data):
 		doc = cleaner(d["Answer"])
 		docs.append(
 			Document(
@@ -163,5 +163,5 @@ def load_index(input_dir="./vector_store"):
 	if not os.path.exists(input_dir):
 		st.warning("index data not found")
 		return None
-	vector_store = FAISS.load_local(input_dir, embeddings)
+	vector_store = FAISS.load_local(input_dir, embeddings, allow_dangerous_deserialization=True)
 	return vector_store
