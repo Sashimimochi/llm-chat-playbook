@@ -1,4 +1,4 @@
-langchain==0.1.11
+langchain==0.3.7
 langchain-core==0.1.35
 huggingface-hub==0.22.0
 sentence-transformers==2.7.0
