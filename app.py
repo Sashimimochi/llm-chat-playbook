@@ -19,6 +19,11 @@ MODEL_LIST = {
         "filename": "calm2-7b-chat.Q5_K_M.gguf",
         "chat_format": None
     },
+    "DeepSeek": {
+        "repo_id": "mmnga/cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-gguf",
+        "filename": "cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-Q4_K_M.gguf",
+        "chat_format": None
+    },
     "FunctionCalling-ja": {
         "repo_id": "TheBloke/calm2-7B-chat-GGUF",
         "filename": "calm2-7b-chat.Q5_K_M.gguf",

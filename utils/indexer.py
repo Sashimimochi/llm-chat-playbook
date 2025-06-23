@@ -46,9 +46,14 @@ cleaner = Compose([
     NewlineFilter()
 ])
 
+MODELS = [
+	"intfloat/multilingual-e5-base",
+	"Qwen/Qwen3-Embedding-0.6B"
+]
+
 @st.cache_resource
 def load_embedding_model():
-	model_name = "intfloat/multilingual-e5-base"
+	model_name = MODELS[0]
 	embeddings = HuggingFaceEmbeddings(model_name=model_name)
 	return embeddings
 
