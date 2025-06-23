@@ -2,16 +2,22 @@
 
 ローカルLLMを使って各種機能を試すサンプルコード
 
+## System Requirements
+
+|||
+|-|-|
+|CPU|6 Core(Ryzen)|
+|Memory|16GB|
+
 ## Quick Start
 
 ```bash
-$ sh setup.sh
-$ docker-compose up -d
+$ make all
 ```
 
 open http://localhost:8503
 
-## Multi Turn Chat
+## Multi Turns Chat
 
 ![](./images/chat01.png)
 ![](./images/chat02.png)
@@ -46,6 +52,13 @@ ModelタイプでFunctionCallingを選択すると外部APIを呼んで回答を
 本サンプルコードでは天気APIを参照して、指定した地域の天気を回答する。
 
 ![](./images/function_calling.png)
+
+## Released Models
+
+別のモデルを扱いたいときは、以下から選択すると良い。
+すべてのモデルが日本語対応しているわけではないで注意。
+
+https://huggingface.co/models?library=gguf&sort=likes
 
 ## Special Thanks
 
