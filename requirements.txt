@@ -3,7 +3,7 @@ langchain-core==0.3.15
 langchain-community==0.3.0
 huggingface-hub==0.26.0
 sentence-transformers==2.7.0
-transformers==4.50.0
+transformers==4.51.0
 jagger==0.1.20
 tika==2.6.0
 stqdm==0.0.5
