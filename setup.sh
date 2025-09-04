@@ -9,16 +9,11 @@ BASE_URL=https://huggingface.co
 USERNAMES=(TheBloke mmnga)
 REPO_NAMES=(calm2-7B-chat-GGUF cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-gguf)
 MODELS=(calm2-7b-chat.Q5_K_M.gguf cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-Q4_K_M.gguf)
-DICT=model_kwdlc.tar.gz
 INDEX_DATA=data.jsonl
 
 mkdir -p $LOG_DIR
-
-if [ ! -d "$MODEL_DIR/kwdlc" ]; then
-    wget https://github.com/lighttransport/jagger-python/releases/download/v0.1.0/$DICT
-    tar -xvf $DICT
-    rm $DICT
-fi
+mkdir -p $MODEL_DIR
+mkdir -p $DATA_DIR
 
 # Function download the model if it does not exist
 function download_model() {
