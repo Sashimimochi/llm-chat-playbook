@@ -14,4 +14,5 @@ down:
 
 clean:
 	@make down
-	rm -rf ./model ./data ./logs
+	docker system prune -f
+	rm -rf ./model ./data ./logs ./vector_store
