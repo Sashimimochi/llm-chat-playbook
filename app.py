@@ -24,6 +24,16 @@ MODEL_LIST = {
         "filename": "cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-Q4_K_M.gguf",
         "chat_format": None
     },
+    "gpt-oss": {
+        "repo_id": "unsloth/gpt-oss-20b-GGUF",
+        "filename": "gpt-oss-20b-Q4_K_M.gguf",
+        "chat_format": None
+    },
+    "gpt-oss-jp": {
+        "repo_id": "Rakushaking/unsloth-gpt-oss-jp-reasoning-finetuned",
+        "filename": "gpt-oss-jp-reasoning-finetuned-20250827-142614.gguf",
+        "chat_format": None
+    },
     "FunctionCalling-ja": {
         "repo_id": "TheBloke/calm2-7B-chat-GGUF",
         "filename": "calm2-7b-chat.Q5_K_M.gguf",
