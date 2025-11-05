@@ -6,9 +6,9 @@ MODEL_DIR=model
 LOG_DIR=logs
 DATA_DIR=data
 BASE_URL=https://huggingface.co
-USERNAMES=(TheBloke mmnga unsloth)
-REPO_NAMES=(calm2-7B-chat-GGUF cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-gguf gpt-oss-20b-GGUF)
-MODELS=(calm2-7b-chat.Q5_K_M.gguf cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-Q4_K_M.gguf gpt-oss-20b-Q4_K_M.gguf)
+USERNAMES=(TheBloke mmnga unsloth Rakushaking)
+REPO_NAMES=(calm2-7B-chat-GGUF cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-gguf gpt-oss-20b-GGUF unsloth-gpt-oss-jp-reasoning-finetuned)
+MODELS=(calm2-7b-chat.Q5_K_M.gguf cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-Q4_K_M.gguf gpt-oss-20b-Q4_K_M.gguf gpt-oss-jp-reasoning-finetuned-20250827-142614.gguf)
 INDEX_DATA=data.jsonl
 
 mkdir -p $LOG_DIR
