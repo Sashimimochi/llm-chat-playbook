@@ -26,7 +26,7 @@ MODEL_LIST = {
     },
     "gpt-oss": {
         "repo_id": "unsloth/gpt-oss-20b-GGUF",
-        "filename": "gpt-oss-20b-GGUF-Q4_K_M.gguf",
+        "filename": "gpt-oss-20b-Q4_K_M.gguf",
         "chat_format": None
     },
     "FunctionCalling-ja": {
