@@ -129,6 +129,7 @@ ASSISTANT:
             urls = []
         st.session_state.conversation.append(template)
         prompt = "\n".join(st.session_state.conversation[-self.window_size * 3 + 1:])
+        msg = ""
         for msg in self.generate(model_name, prompt):
             yield msg
         else:
@@ -300,6 +301,7 @@ def main():
             with st.spinner("Assistant thinking..."):
                 placeholder = st.empty()
                 timestamp_placeholder = st.empty()
+                msg = "" # msgを空文字列で初期化
                 for msg in llm.on_input_change(model_name=model_name, top_k=top_k):
                     placeholder.markdown(msg)
                 refs = []
