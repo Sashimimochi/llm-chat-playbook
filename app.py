@@ -2,6 +2,7 @@ import json
 import os
 import requests
 import streamlit as st
+from datetime import datetime
 from utils.mylogger import getLogger, set_logger
 from llama_cpp import Llama
 from utils.indexer import create_index, load_index, tokenize
@@ -128,6 +129,7 @@ ASSISTANT:
             urls = []
         st.session_state.conversation.append(template)
         prompt = "\n".join(st.session_state.conversation[-self.window_size * 3 + 1:])
+        msg = ""
         for msg in self.generate(model_name, prompt):
             yield msg
         else:
@@ -252,25 +254,54 @@ def main():
         st.session_state.messages = [
             {
                 "role": "assistant",
-                "content": "私はお助けBotです。何かお手伝いできることがあれば聞いてください。"
+                "content": "私はお助けBotです。何かお手伝いできることがあれば聞いてください。",
+                "timestamp": datetime.now()
             }
         ]
+
+    # Custom CSS for timestamp styling
+    st.markdown("""
+    <style>
+    .timestamp {
+        font-size: 0.7em;
+        color: #888;
+        text-align: right;
+        margin-top: 0.5em;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     # display chat messages from history on app rerun
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            # Display timestamp
+            timestamp_str = message.get("timestamp", datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
+            latency_str = ""
+            if message["role"] == "assistant" and "latency" in message:
+                latency_str = f" (レイテンシー: {message['latency']:.2f}秒)"
+            st.markdown(f'<div class="timestamp">{timestamp_str}{latency_str}</div>', unsafe_allow_html=True)
 
     # react to user input
     if prompt := st.chat_input("What is up?", key="user_message"):
+        # Record user message timestamp
+        user_timestamp = datetime.now()
         # display user message in chat message container
-        st.chat_message("user").markdown(prompt)
+        with st.chat_message("user"):
+            st.markdown(prompt)
+            st.markdown(f'<div class="timestamp">{user_timestamp.strftime("%Y-%m-%d %H:%M:%S")}</div>', unsafe_allow_html=True)
         # add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state.messages.append({
+            "role": "user",
+            "content": prompt,
+            "timestamp": user_timestamp
+        })
         # display assistant response in chat message container
         with st.chat_message("assistant"):
             with st.spinner("Assistant thinking..."):
                 placeholder = st.empty()
+                timestamp_placeholder = st.empty()
+                msg = "" # msgを空文字列で初期化
                 for msg in llm.on_input_change(model_name=model_name, top_k=top_k):
                     placeholder.markdown(msg)
                 refs = []
@@ -278,8 +309,18 @@ def main():
                     refs.append(f"\n- {url}")
                 refs_msg = f"\n\n参考資料:{''.join(refs)}" if len(refs) > 0 else ""
                 placeholder.markdown(msg+refs_msg)
+                # Record assistant response timestamp and calculate latency
+                assistant_timestamp = datetime.now()
+                latency = (assistant_timestamp - user_timestamp).total_seconds()
+                timestamp_str = assistant_timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                timestamp_placeholder.markdown(f'<div class="timestamp">{timestamp_str} (レイテンシー: {latency:.2f}秒)</div>', unsafe_allow_html=True)
         # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": msg+refs_msg})
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": msg+refs_msg,
+            "timestamp": assistant_timestamp,
+            "latency": latency
+        })
 
 if __name__ == "__main__":
     main()
