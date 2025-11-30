@@ -27,8 +27,8 @@ open http://localhost:8503
 
 Calm2
 ![](./images/calm2_example.png)
-DeepSeak
-![](./images/deepseak_example.png)
+DeepSeek
+![](./images/deepseek_example.png)
 gpt-oss
 ![](./images/gpt_oss_jp_example.png)
 
