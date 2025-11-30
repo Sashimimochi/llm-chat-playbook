@@ -23,6 +23,15 @@ open http://localhost:8503
 ![](./images/chat02.png)
 ![](./images/chat03.png)
 
+### モデル比較
+
+Calm2
+![](./images/calm2_example.png)
+DeepSeek
+![](./images/deepseek_example.png)
+gpt-oss
+![](./images/gpt_oss_jp_example.png)
+
 ## RAG
 
 参考情報を1以上にしてチャットを打つと、閾値以上の類似度のドキュメントがあれば、そのテキストを参照して回答を生成する。
