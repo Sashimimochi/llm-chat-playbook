@@ -39,7 +39,7 @@ langchain-text-splitters==1.0.0a1
 langsmith==0.3.45
 llama_cpp_python==0.3.16
 MarkupSafe==3.0.2
-marshmallow==3.26.1
+marshmallow==3.26.2
 mmh3==4.1.0
 mpmath==1.3.0
 multidict==6.6.4
