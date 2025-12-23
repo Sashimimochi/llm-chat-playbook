@@ -13,7 +13,7 @@ click==8.2.1
 dataclasses-json==0.6.7
 diskcache==5.6.3
 faiss-cpu==1.8.0
-filelock==3.19.1
+filelock==3.20.1
 frozenlist==1.7.0
 fsspec==2025.9.0
 gitdb==4.0.12
