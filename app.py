@@ -40,6 +40,11 @@ MODEL_LIST = {
         "filename": "Llama-3.1-Swallow-8B-Instruct-v0.5-Q4_K_M.gguf",
         "chat_format": None
     },
+    "Elayza": {
+        "repo_id": "elyza/Llama-3-ELYZA-JP-8B-GGUF",
+        "filename": "Llama-3-ELYZA-JP-8B-q4_k_m.gguf",
+        "chat_format": None
+    },
     "FunctionCalling-ja": {
         "repo_id": "TheBloke/calm2-7B-chat-GGUF",
         "filename": "calm2-7b-chat.Q5_K_M.gguf",
