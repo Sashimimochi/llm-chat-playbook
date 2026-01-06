@@ -35,6 +35,11 @@ MODEL_LIST = {
         "filename": "gpt-oss-jp-reasoning-finetuned-20250827-142614.gguf",
         "chat_format": None
     },
+    "Swallow": {
+        "repo_id": "mmnga/Llama-3.1-Swallow-8B-Instruct-v0.5-gguf",
+        "filename": "Llama-3.1-Swallow-8B-Instruct-v0.5-Q4_K_M.gguf",
+        "chat_format": None
+    },
     "FunctionCalling-ja": {
         "repo_id": "TheBloke/calm2-7B-chat-GGUF",
         "filename": "calm2-7b-chat.Q5_K_M.gguf",
