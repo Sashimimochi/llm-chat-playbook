@@ -18,42 +18,50 @@ MODEL_LIST = {
     "Calm2": {
         "repo_id": "TheBloke/calm2-7B-chat-GGUF",
         "filename": "calm2-7b-chat.Q5_K_M.gguf",
-        "chat_format": None
+        "chat_format": None,
+        "prompt_format": "calm2"
     },
     "DeepSeek": {
         "repo_id": "mmnga/cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-gguf",
         "filename": "cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-Q4_K_M.gguf",
-        "chat_format": None
+        "chat_format": None,
+        "prompt_format": "chatml"
     },
     "gpt-oss": {
         "repo_id": "unsloth/gpt-oss-20b-GGUF",
         "filename": "gpt-oss-20b-Q4_K_M.gguf",
-        "chat_format": None
+        "chat_format": None,
+        "prompt_format": "chatml"
     },
     "gpt-oss-jp": {
         "repo_id": "Rakushaking/unsloth-gpt-oss-jp-reasoning-finetuned",
         "filename": "gpt-oss-jp-reasoning-finetuned-20250827-142614.gguf",
-        "chat_format": None
+        "chat_format": None,
+        "prompt_format": "chatml"
     },
     "Swallow": {
         "repo_id": "mmnga/Llama-3.1-Swallow-8B-Instruct-v0.5-gguf",
         "filename": "Llama-3.1-Swallow-8B-Instruct-v0.5-Q4_K_M.gguf",
-        "chat_format": None
+        "chat_format": None,
+        "prompt_format": "llama3"
     },
     "Elayza": {
         "repo_id": "elyza/Llama-3-ELYZA-JP-8B-GGUF",
         "filename": "Llama-3-ELYZA-JP-8B-q4_k_m.gguf",
-        "chat_format": None
+        "chat_format": None,
+        "prompt_format": "llama3"
     },
     "FunctionCalling-ja": {
         "repo_id": "TheBloke/calm2-7B-chat-GGUF",
         "filename": "calm2-7b-chat.Q5_K_M.gguf",
-        "chat_format": "chatml-function-calling"
+        "chat_format": "chatml-function-calling",
+        "prompt_format": "calm2"
     },
     "FunctionCalling-en": {
         "repo_id": "",
         "filename": "",
-        "chat_format": "chatml-function-calling"
+        "chat_format": "chatml-function-calling",
+        "prompt_format": "calm2"
     },
 }
 
@@ -116,16 +124,43 @@ class LLM:
         )
         return llm
 
-    def on_input_change(self, model_name, top_k=1, temperature=0.7, top_p=0.3, top_k_param=20, repeat_penalty=1.1, max_tokens=None):
-        user_message = f"{st.session_state.user_message}"
-        logger.info(f"user message:{user_message}")
-        docs = self.vector_search(user_message, top_k=top_k)
-        if docs:
-            context = "\n".join([doc.page_content for doc in docs])
-            urls = [doc.metadata.get("url") for doc in docs]
-            if len(context) > self.MAX_TOKENS * 1.2:
-                context = context[:int(self.MAX_TOKENS * 1.2)]
-            template = """USER: あなたはユーザーの質問に答えるAIアシスタントBotです。
+    def get_prompt_format(self, model_name):
+        """モデルに応じたプロンプトフォーマットを取得"""
+        return MODEL_LIST[model_name].get("prompt_format", "calm2")
+
+    def format_prompt(self, model_name, user_message, context=None):
+        """モデル別のプロンプトフォーマットに変換"""
+        prompt_format = self.get_prompt_format(model_name)
+
+        if context:
+            # RAGを使う場合
+            if prompt_format == "chatml":
+                template = """<|im_start|>system
+あなたはユーザーの質問に答えるAIアシスタントBotです。
+ユーザーの質問に対して適切なアドバイスを答えます。
+情報として、以下の内容を参考にしてください。
+====
+{context}
+====<|im_end|>
+<|im_start|>user
+{user_message}<|im_end|>
+<|im_start|>assistant
+""".format(user_message=user_message, context=context)
+            elif prompt_format == "llama3":
+                template = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+あなたはユーザーの質問に答えるAIアシスタントBotです。
+ユーザーの質問に対して適切なアドバイスを答えます。
+情報として、以下の内容を参考にしてください。
+====
+{context}
+====<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+{user_message}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+""".format(user_message=user_message, context=context)
+            else:  # calm2
+                template = """USER: あなたはユーザーの質問に答えるAIアシスタントBotです。
 ユーザーの質問に対して適切なアドバイスを答えます。
 情報として、以下の内容を参考にしてください。
 ====
@@ -135,7 +170,46 @@ class LLM:
 ASSISTANT:
 """.format(user_message=user_message, context=context)
         else:
-            template = """USER: {user_message} ASSISTANT: """.format(user_message=user_message)
+            # RAGを使わない場合
+            if prompt_format == "chatml":
+                template = """<|im_start|>user
+{user_message}<|im_end|>
+<|im_start|>assistant
+""".format(user_message=user_message)
+            elif prompt_format == "llama3":
+                template = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+
+{user_message}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+""".format(user_message=user_message)
+            else:  # calm2
+                template = """USER: {user_message} ASSISTANT: """.format(user_message=user_message)
+
+        return template
+
+    def get_stop_tokens(self, model_name):
+        """モデル別のストップトークンを取得"""
+        prompt_format = self.get_prompt_format(model_name)
+
+        if prompt_format == "chatml":
+            return ["<|im_start|>", "<|im_end|>"]
+        elif prompt_format == "llama3":
+            return ["<|eot_id|>", "<|end_of_text|>"]
+        else:  # calm2
+            return ["SYSTEM:", "USER:", "ASSISTANT:"]
+
+    def on_input_change(self, model_name, top_k=1):
+        user_message = f"{st.session_state.user_message}"
+        logger.info(f"user message:{user_message}")
+        docs = self.vector_search(user_message, top_k=top_k)
+        if docs:
+            context = "\n".join([doc.page_content for doc in docs])
+            urls = [doc.metadata.get("url") for doc in docs]
+            if len(context) > self.MAX_TOKENS * 1.2:
+                context = context[:int(self.MAX_TOKENS * 1.2)]
+            template = self.format_prompt(model_name, user_message, context)
+        else:
+            template = self.format_prompt(model_name, user_message)
             urls = []
         st.session_state.conversation.append(template)
         prompt = "\n".join(st.session_state.conversation[-self.window_size * 3 + 1:])
@@ -156,6 +230,7 @@ ASSISTANT:
         logger.info(f"prompt for model: {prompt}")
         if max_tokens is None:
             max_tokens = self.MAX_TOKENS
+        stop_tokens = self.get_stop_tokens(model_name)
         streamer = llm(
             prompt,
             temperature=temperature,
@@ -163,7 +238,7 @@ ASSISTANT:
             top_k=top_k,
             repeat_penalty=repeat_penalty,
             max_tokens=max_tokens,
-            stop=["SYSTEM:", "USER:", "ASSISTANT:"],
+            stop=stop_tokens,
             stream=True
         )
         partial_message = ""
@@ -239,7 +314,30 @@ ASSISTANT:
         info = method(**arguments)
         logger.info(f"{funcname}: {info}")
 
-        new_prompt = f"""{prompt}わかりました。
+        # モデルのプロンプトフォーマットに合わせてレスポンスを生成
+        prompt_format = self.get_prompt_format(model_name)
+        if prompt_format == "chatml":
+            new_prompt = f"""{prompt}<|im_end|>
+<|im_start|>system
+調べたところ、以下のような情報が得られました。
+================
+{info}
+================
+上記の情報を整理してユーザにわかりやすく伝えてください。<|im_end|>
+<|im_start|>assistant
+"""
+        elif prompt_format == "llama3":
+            new_prompt = f"""{prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+調べたところ、以下のような情報が得られました。
+================
+{info}
+================
+上記の情報を整理してユーザにわかりやすく伝えてください。<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+"""
+        else:  # calm2
+            new_prompt = f"""{prompt}わかりました。
 USER: 調べたところ、以下のような情報が得られました。
 ================
 {info}
@@ -255,7 +353,7 @@ def main():
     # サイドバーにモデルパラメータ調整UIを追加
     with st.sidebar:
         st.header("モデルパラメータ設定")
-        
+
         temperature = st.slider(
             "Temperature（温度）",
             min_value=0.0,
@@ -264,7 +362,7 @@ def main():
             step=0.1,
             help="値が高いほど出力がランダムになります。創造的なタスクには高い値、決定論的なタスクには低い値を使用してください。"
         )
-        
+
         top_p = st.slider(
             "Top P",
             min_value=0.0,
@@ -273,7 +371,7 @@ def main():
             step=0.05,
             help="nucleus samplingのパラメータ。値を低くすると、より確実性の高いトークンのみを選択します。"
         )
-        
+
         top_k_param = st.slider(
             "Top K",
             min_value=1,
@@ -282,7 +380,7 @@ def main():
             step=1,
             help="各ステップで考慮する上位Kトークンの数。値を低くすると出力の多様性が減ります。"
         )
-        
+
         repeat_penalty = st.slider(
             "Repeat Penalty（繰り返しペナルティ）",
             min_value=1.0,
@@ -291,7 +389,7 @@ def main():
             step=0.05,
             help="繰り返しを抑制するペナルティ。1.0は繰り返しペナルティなし。"
         )
-        
+
         max_tokens = st.slider(
             "Max Tokens（最大トークン数）",
             min_value=256,
@@ -364,7 +462,7 @@ def main():
                 timestamp_placeholder = st.empty()
                 msg = "" # msgを空文字列で初期化
                 for msg in llm.on_input_change(
-                    model_name=model_name, 
+                    model_name=model_name,
                     top_k=top_k,
                     temperature=temperature,
                     top_p=top_p,
