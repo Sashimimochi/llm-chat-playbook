@@ -25,6 +25,12 @@ open http://localhost:8503
 
 ### モデル比較
 
+各モデルの特性に応じて、適切なプロンプトフォーマットが自動的に適用されます：
+
+- **Calm2**: `USER:/ASSISTANT:` 形式
+- **DeepSeek, gpt-oss系**: ChatML形式 (`<|im_start|>`/`<|im_end|>`)
+- **Swallow, Elayza**: Llama 3形式 (`<|begin_of_text|>`/`<|eot_id|>`)
+
 Calm2
 ![](./images/calm2_example.png)
 DeepSeek
