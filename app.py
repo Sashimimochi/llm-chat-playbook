@@ -116,7 +116,7 @@ class LLM:
         )
         return llm
 
-    def on_input_change(self, model_name, top_k=1):
+    def on_input_change(self, model_name, top_k=1, temperature=0.7, top_p=0.3, top_k_param=20, repeat_penalty=1.1, max_tokens=None):
         user_message = f"{st.session_state.user_message}"
         logger.info(f"user message:{user_message}")
         docs = self.vector_search(user_message, top_k=top_k)
@@ -140,27 +140,29 @@ ASSISTANT:
         st.session_state.conversation.append(template)
         prompt = "\n".join(st.session_state.conversation[-self.window_size * 3 + 1:])
         msg = ""
-        for msg in self.generate(model_name, prompt):
+        for msg in self.generate(model_name, prompt, temperature, top_p, top_k_param, repeat_penalty, max_tokens):
             yield msg
         else:
             st.session_state.urls = urls
             st.session_state.conversation.append(msg)
 
-    def generate(self, model_name, prompt):
+    def generate(self, model_name, prompt, temperature=0.7, top_p=0.3, top_k=20, repeat_penalty=1.1, max_tokens=None):
         if MODEL_LIST[model_name]["chat_format"] == "chatml-function-calling":
             prompt = self.generate_by_fc(model_name, prompt)
-        return self.generate_chat(model_name, prompt)
+        return self.generate_chat(model_name, prompt, temperature, top_p, top_k, repeat_penalty, max_tokens)
 
-    def generate_chat(self, model_name, prompt):
+    def generate_chat(self, model_name, prompt, temperature=0.7, top_p=0.3, top_k=20, repeat_penalty=1.1, max_tokens=None):
         llm = self.load_model(model_name)
         logger.info(f"prompt for model: {prompt}")
+        if max_tokens is None:
+            max_tokens = self.MAX_TOKENS
         streamer = llm(
             prompt,
-            temperature=0.7,
-            top_p=0.3,
-            top_k=20,
-            repeat_penalty=1.1,
-            max_tokens=self.MAX_TOKENS,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            repeat_penalty=repeat_penalty,
+            max_tokens=max_tokens,
             stop=["SYSTEM:", "USER:", "ASSISTANT:"],
             stream=True
         )
@@ -250,6 +252,55 @@ def main():
     llm = LLM()
     st.title("Assistant Bot")
 
+    # サイドバーにモデルパラメータ調整UIを追加
+    with st.sidebar:
+        st.header("モデルパラメータ設定")
+        
+        temperature = st.slider(
+            "Temperature（温度）",
+            min_value=0.0,
+            max_value=2.0,
+            value=0.7,
+            step=0.1,
+            help="値が高いほど出力がランダムになります。創造的なタスクには高い値、決定論的なタスクには低い値を使用してください。"
+        )
+        
+        top_p = st.slider(
+            "Top P",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.3,
+            step=0.05,
+            help="nucleus samplingのパラメータ。値を低くすると、より確実性の高いトークンのみを選択します。"
+        )
+        
+        top_k_param = st.slider(
+            "Top K",
+            min_value=1,
+            max_value=100,
+            value=20,
+            step=1,
+            help="各ステップで考慮する上位Kトークンの数。値を低くすると出力の多様性が減ります。"
+        )
+        
+        repeat_penalty = st.slider(
+            "Repeat Penalty（繰り返しペナルティ）",
+            min_value=1.0,
+            max_value=2.0,
+            value=1.1,
+            step=0.05,
+            help="繰り返しを抑制するペナルティ。1.0は繰り返しペナルティなし。"
+        )
+        
+        max_tokens = st.slider(
+            "Max Tokens（最大トークン数）",
+            min_value=256,
+            max_value=4096,
+            value=2048,
+            step=256,
+            help="生成する最大トークン数。"
+        )
+
     if st.button("Create index"):
         with st.spinner("Creating index..."):
             create_index()
@@ -312,7 +363,15 @@ def main():
                 placeholder = st.empty()
                 timestamp_placeholder = st.empty()
                 msg = "" # msgを空文字列で初期化
-                for msg in llm.on_input_change(model_name=model_name, top_k=top_k):
+                for msg in llm.on_input_change(
+                    model_name=model_name, 
+                    top_k=top_k,
+                    temperature=temperature,
+                    top_p=top_p,
+                    top_k_param=top_k_param,
+                    repeat_penalty=repeat_penalty,
+                    max_tokens=max_tokens
+                ):
                     placeholder.markdown(msg)
                 refs = []
                 for url in st.session_state.urls:
