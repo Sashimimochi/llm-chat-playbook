@@ -51,6 +51,12 @@ MODEL_LIST = {
         "chat_format": None,
         "prompt_format": "llama3"
     },
+    "Qwen2.5": {
+        "repo_id": "Qwen/Qwen2.5-7B-Instruct-GGUF",
+        "filename": "qwen2.5-7b-instruct-q4_k_m.gguf",
+        "chat_format": None,
+        "prompt_format": "chatml"
+    },
     "FunctionCalling-ja": {
         "repo_id": "TheBloke/calm2-7B-chat-GGUF",
         "filename": "calm2-7b-chat.Q5_K_M.gguf",
