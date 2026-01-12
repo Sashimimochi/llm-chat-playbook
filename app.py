@@ -57,6 +57,12 @@ MODEL_LIST = {
         "chat_format": None,
         "prompt_format": "chatml"
     },
+    "Qwen3-4B-Thinking": {
+        "repo_id": "lmstudio-community/Qwen3-4B-Thinking-2507-GGUF",
+        "filename": "Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
+        "chat_format": None,
+        "prompt_format": "chatml"
+    },
     "FunctionCalling-ja": {
         "repo_id": "TheBloke/calm2-7B-chat-GGUF",
         "filename": "calm2-7b-chat.Q5_K_M.gguf",
