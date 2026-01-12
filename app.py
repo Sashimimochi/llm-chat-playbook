@@ -20,81 +20,73 @@ MODEL_LIST = {
         "repo_id": "TheBloke/calm2-7B-chat-GGUF",
         "filename": "calm2-7b-chat.Q5_K_M.gguf",
         "chat_format": None,
-        "prompt_format": "calm2"
+        "prompt_format": "calm2",
+        "hide_thinking": False
     },
     "DeepSeek": {
         "repo_id": "mmnga/cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-gguf",
         "filename": "cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-Q4_K_M.gguf",
         "chat_format": None,
-        "prompt_format": "chatml"
+        "prompt_format": "chatml",
+        "hide_thinking": False
     },
     "gpt-oss": {
         "repo_id": "unsloth/gpt-oss-20b-GGUF",
         "filename": "gpt-oss-20b-Q4_K_M.gguf",
         "chat_format": None,
-        "prompt_format": "chatml"
+        "prompt_format": "chatml",
+        "hide_thinking": False
     },
     "gpt-oss-jp": {
         "repo_id": "Rakushaking/unsloth-gpt-oss-jp-reasoning-finetuned",
         "filename": "gpt-oss-jp-reasoning-finetuned-20250827-142614.gguf",
         "chat_format": None,
-        "prompt_format": "chatml"
+        "prompt_format": "chatml",
+        "hide_thinking": False
     },
     "Swallow": {
         "repo_id": "mmnga/Llama-3.1-Swallow-8B-Instruct-v0.5-gguf",
         "filename": "Llama-3.1-Swallow-8B-Instruct-v0.5-Q4_K_M.gguf",
         "chat_format": None,
-        "prompt_format": "llama3"
+        "prompt_format": "llama3",
+        "hide_thinking": False
     },
     "Elayza": {
         "repo_id": "elyza/Llama-3-ELYZA-JP-8B-GGUF",
         "filename": "Llama-3-ELYZA-JP-8B-q4_k_m.gguf",
         "chat_format": None,
-        "prompt_format": "llama3"
+        "prompt_format": "llama3",
+        "hide_thinking": False
     },
     "Qwen3-4B": {
         "repo_id": "lmstudio-community/Qwen3-4B-Instruct-2507-GGUF",
         "filename": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
         "chat_format": None,
-        "prompt_format": "chatml"
+        "prompt_format": "chatml",
+        "hide_thinking": False
     },
     "Qwen3-4B-Thinking": {
         "repo_id": "lmstudio-community/Qwen3-4B-Thinking-2507-GGUF",
         "filename": "Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
         "chat_format": None,
-        "prompt_format": "chatml"
+        "prompt_format": "chatml",
+        "hide_thinking": True
     },
     "FunctionCalling-ja": {
         "repo_id": "TheBloke/calm2-7B-chat-GGUF",
         "filename": "calm2-7b-chat.Q5_K_M.gguf",
         "chat_format": "chatml-function-calling",
-        "prompt_format": "calm2"
+        "prompt_format": "calm2",
+        "hide_thinking": False
     },
     "FunctionCalling-en": {
         "repo_id": "",
         "filename": "",
         "chat_format": "chatml-function-calling",
-        "prompt_format": "calm2"
+        "prompt_format": "calm2",
+        "hide_thinking": False
     },
 }
-
-def extract_thinking_content(text):
-    """
-    思考プロセスを抽出する
-    <thinking>...</thinking> または <think>...</think> タグで囲まれた内容を抽出
-    """
-    # <thinking> または <think> タグで囲まれた内容を抽出
-    thinking_patterns = [
-        r'<thinking>(.*?)</thinking>',
-        r'<think>(.*?)</think>'
-    ]
-    
-    thinking_content = []
-    for pattern in thinking_patterns:
-        matches = re.findall(pattern, text, re.DOTALL)
-        thinking_content.extend(matches)
-    
-    return thinking_content
 
 def remove_thinking_tags(text):
     """
@@ -296,19 +288,21 @@ ASSISTANT:
             stream=True
         )
         partial_message = ""
-        is_thinking_model = "Thinking" in model_name
+        hide_thinking = MODEL_LIST[model_name].get("hide_thinking", False)
         
         for msg in streamer:
             partial_message += msg.get("choices")[0].get("text")
             
             # Thinking モデルの場合、思考タグを除去して表示
-            if is_thinking_model:
+            if hide_thinking:
                 display_message = remove_thinking_tags(partial_message)
-                # ログには完全な出力を保存
-                logger.debug(f"Full output with thinking: {partial_message}")
                 yield display_message
             else:
                 yield partial_message
+        
+        # ストリーミング終了後、完全な出力をログに保存（Thinkingモデルの場合）
+        if hide_thinking:
+            logger.info(f"Full output with thinking: {partial_message}")
 
     def get_location_codes(self):
         with open("data/cities.json") as f:
