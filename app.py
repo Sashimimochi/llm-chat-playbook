@@ -198,7 +198,7 @@ ASSISTANT:
         else:  # calm2
             return ["SYSTEM:", "USER:", "ASSISTANT:"]
 
-    def on_input_change(self, model_name, top_k=1):
+    def on_input_change(self, model_name, top_k=1, temperature=0.7, top_p=0.3, top_k_param=20, repeat_penalty=1.1, max_tokens=None):
         user_message = f"{st.session_state.user_message}"
         logger.info(f"user message:{user_message}")
         docs = self.vector_search(user_message, top_k=top_k)
