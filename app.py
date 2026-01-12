@@ -51,9 +51,9 @@ MODEL_LIST = {
         "chat_format": None,
         "prompt_format": "llama3"
     },
-    "Qwen2.5": {
-        "repo_id": "Qwen/Qwen2.5-7B-Instruct-GGUF",
-        "filename": "qwen2.5-7b-instruct-q4_k_m.gguf",
+    "Qwen3-4B": {
+        "repo_id": "lmstudio-community/Qwen3-4B-Instruct-2507-GGUF",
+        "filename": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
         "chat_format": None,
         "prompt_format": "chatml"
     },
