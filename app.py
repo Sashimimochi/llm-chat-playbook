@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import requests
 import streamlit as st
 from datetime import datetime
@@ -76,6 +77,47 @@ MODEL_LIST = {
         "prompt_format": "calm2"
     },
 }
+
+def extract_thinking_content(text):
+    """
+    思考プロセスを抽出する
+    <thinking>...</thinking> または <think>...</think> タグで囲まれた内容を抽出
+    """
+    # <thinking> または <think> タグで囲まれた内容を抽出
+    thinking_patterns = [
+        r'<thinking>(.*?)</thinking>',
+        r'<think>(.*?)</think>'
+    ]
+    
+    thinking_content = []
+    for pattern in thinking_patterns:
+        matches = re.findall(pattern, text, re.DOTALL)
+        thinking_content.extend(matches)
+    
+    return thinking_content
+
+def remove_thinking_tags(text):
+    """
+    思考プロセスのタグを削除する
+    <thinking>...</thinking> または <think>...</think> タグとその内容を削除
+    """
+    # <thinking> または <think> タグとその内容を削除
+    thinking_patterns = [
+        r'<thinking>.*?</thinking>',
+        r'<think>.*?</think>'
+    ]
+    
+    cleaned_text = text
+    for pattern in thinking_patterns:
+        cleaned_text = re.sub(pattern, '', cleaned_text, flags=re.DOTALL)
+    
+    # 複数の連続した改行を1つにまとめる
+    cleaned_text = re.sub(r'\n\s*\n+', '\n\n', cleaned_text)
+    
+    # 前後の空白を削除
+    cleaned_text = cleaned_text.strip()
+    
+    return cleaned_text
 
 class LLM:
     def __init__(
@@ -254,9 +296,19 @@ ASSISTANT:
             stream=True
         )
         partial_message = ""
+        is_thinking_model = "Thinking" in model_name
+        
         for msg in streamer:
             partial_message += msg.get("choices")[0].get("text")
-            yield partial_message
+            
+            # Thinking モデルの場合、思考タグを除去して表示
+            if is_thinking_model:
+                display_message = remove_thinking_tags(partial_message)
+                # ログには完全な出力を保存
+                logger.debug(f"Full output with thinking: {partial_message}")
+                yield display_message
+            else:
+                yield partial_message
 
     def get_location_codes(self):
         with open("data/cities.json") as f:
