@@ -66,7 +66,7 @@ packaging==24.2
 pandas==2.3.2
 pillow==11.3.0
 propcache==0.3.2
-protobuf==6.32.0
+protobuf==6.33.5
 pyarrow==21.0.0
 pydantic==2.11.7
 pydantic-settings==2.10.1
