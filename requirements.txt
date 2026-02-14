@@ -64,7 +64,7 @@ nvidia-nvtx-cu12==12.8.90
 orjson==3.11.3
 packaging==24.2
 pandas==2.3.2
-pillow==11.3.0
+pillow==12.1.1
 propcache==0.3.2
 protobuf==6.33.5
 pyarrow==21.0.0
@@ -90,7 +90,7 @@ smmap==5.0.2
 sniffio==1.3.1
 SQLAlchemy==2.0.43
 stqdm==0.0.5
-streamlit==1.49.1
+streamlit==1.54.0
 sympy==1.14.0
 tenacity==8.5.0
 threadpoolctl==3.6.0
