@@ -34,7 +34,7 @@ jsonschema==4.25.1
 jsonschema-specifications==2025.4.1
 langchain==1.0.0a12
 langchain-community==0.3.31
-langchain-core==1.0.0a8
+langchain-core==1.2.11
 langchain-text-splitters==1.0.0a1
 langsmith==0.3.45
 llama_cpp_python==0.3.16
