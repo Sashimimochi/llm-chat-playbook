@@ -95,7 +95,7 @@ sympy==1.14.0
 tenacity==8.5.0
 threadpoolctl==3.6.0
 tika==3.1.0
-tokenizers==0.22.0
+tokenizers==0.23.0
 toml==0.10.2
 torch==2.8.0
 tornado==6.5.5
