@@ -36,7 +36,7 @@ langchain==1.0.0a12
 langchain-community==0.3.31
 langchain-core==1.2.28
 langchain-text-splitters==1.0.0a1
-langsmith==0.3.45
+langsmith==0.7.31
 llama_cpp_python==0.3.16
 MarkupSafe==3.0.2
 marshmallow==3.26.2
