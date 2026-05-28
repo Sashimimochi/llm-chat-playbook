@@ -79,3 +79,24 @@ https://huggingface.co/models?library=gguf&sort=likes
 
 - https://weather.tsukumijima.net/
 - https://easy2.connpass.com/
+
+## Standalone Ollama Chat App
+
+既存のStreamlitアプリとは独立して、Ollama向けのCLIアプリを追加しました。
+
+### セットアップ
+
+```bash
+pip install -r requirements.txt
+```
+
+### 実行
+
+```bash
+python ollama_chat_app.py --model qwen3:8b --window-size 10 --num-predict 2048
+```
+
+- `/exit` または `quit` で終了できます。
+- 会話履歴は `messages` リストとして保持します。
+- コンテキストは「system + 直近Nターン」のみを送信します。
+- `stream=True` でトークンを逐次表示します。
