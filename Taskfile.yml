@@ -1,0 +1,32 @@
+version: '3'
+
+tasks:
+  setup:
+    desc: Set up local environment
+    cmds:
+      - sh setup.sh
+
+  launch:
+    desc: Start the app with Docker Compose and open browser
+    cmds:
+      - docker compose up -d
+      - python scripts/open_url.py http://localhost:8503
+
+  all:
+    desc: Run setup and launch tasks
+    deps:
+      - setup
+      - launch
+
+  down:
+    desc: Stop Docker Compose services
+    cmds:
+      - docker compose down
+
+  clean:
+    desc: Stop services and remove generated artifacts
+    deps:
+      - down
+    cmds:
+      - docker system prune -f
+      - rm -rf ./model ./data ./logs ./vector_store
