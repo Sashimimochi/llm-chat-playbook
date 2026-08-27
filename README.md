@@ -12,7 +12,7 @@
 ## Quick Start
 
 ```bash
-$ make all
+$ task all
 ```
 
 open http://localhost:8503
