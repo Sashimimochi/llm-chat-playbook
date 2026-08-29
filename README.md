@@ -1,83 +1,38 @@
 # LLM Chat Playbook
 
-ローカルLLMを使って各種機能を試すサンプルコードリポジトリです。
+## Purpose
 
-[貧弱環境でもここまでやれる Local LLM](https://techbookfest.org/product/ehw1DzL9T4wn03CTd13VTA?productVariantID=8KicahJwJsrpQXgsnUmQz1)に付属のリポジトリでもあります。
+実装した内容をGitHubのDraft Pull Requestとして公開する。
 
-## System Requirements
+## Rules
 
-|||
-|-|-|
-|CPU|6 Core(Ryzen)|
-|Memory|16GB|
+- main/masterへ直接commitしない。
+- force pushしない。
+- 作業開始時に専用branchを作成する。
+- branch名は以下の形式:
+  - feature/<short-description>
+  - fix/<short-description>
+  - refactor/<short-description>
+  - chore/<short-description>
 
-## Quick Start
+## Workflow
 
-```bash
-$ make all
-```
+1. 現在のbranchを確認する。
+2. main/masterへ戻る。
+3. originのmain/masterをpullする。
+4. 作業branchを作成する。
+5. 実装する。
+6. テストを実行する。
+7. 差分を確認する。
+8. commitする。
+9. originへpushする。
+10. `scripts/create-pr.sh` を実行してDraft PRを作成する。
+11. PR URLを報告する。
 
-open http://localhost:8503
+## Important
 
-## Multi Turns Chat
+GitHubへのPR作成には `gh pr create` を使用する。
 
-![](./images/chat01.png)
-![](./images/chat02.png)
-![](./images/chat03.png)
-
-### モデル比較
-
-各モデルの特性に応じて、適切なプロンプトフォーマットが自動的に適用されます：
-
-- **Calm2**: `USER:/ASSISTANT:` 形式
-- **DeepSeek, gpt-oss系, Qwen3-4B, Qwen3-4B-Thinking**: ChatML形式 (`<|im_start|>`/`<|im_end|>`)
-- **Swallow, Elayza**: Llama 3形式 (`<|begin_of_text|>`/`<|eot_id|>`)
-
-Calm2
-![](./images/calm2_example.png)
-DeepSeek
-![](./images/deepseek_example.png)
-gpt-oss
-![](./images/gpt_oss_jp_example.png)
-
-## RAG
-
-参考情報を1以上にしてチャットを打つと、閾値以上の類似度のドキュメントがあれば、そのテキストを参照して回答を生成する。
-
-![](./images/rag.png)
-
-### インデックスデータの作成
-
-`data` ディレクトリ配下にインデックスさせたい `.txt` や `.pdf` を配置する。
-
-```bash
-$ tree data/
-data/
-└── easyeasy.txt
-```
-
-Create Indexボタンを押す。
-しばらく待つとインデックスデータが作成される。
-
-![](./images/create_index.png)
-
-※大量のデータやサイズの大きいPDFファイルをインデックスしようとすると、処理に失敗してシステムがクラッシュすることがあるので注意
-
-## Function Calling
-
-ModelタイプでFunctionCallingを選択すると外部APIを呼んで回答を生成する。
-本サンプルコードでは天気APIを参照して、指定した地域の天気を回答する。
-
-![](./images/function_calling.png)
-
-## Released Models
-
-別のモデルを扱いたいときは、以下から選択すると良い。
-すべてのモデルが日本語対応しているわけではないで注意。
-
-https://huggingface.co/models?library=gguf&sort=likes
-
-## Special Thanks
-
-- https://weather.tsukumijima.net/
-- https://easy2.connpass.com/
+Git操作で迷った場合は推測せず、
+`git status`、`git branch --show-current`、
+`git remote -v` 等で現在状態を確認する。

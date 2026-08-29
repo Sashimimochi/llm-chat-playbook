@@ -1,60 +1,25 @@
+version: '3.8'
+
 services:
-  # ---- ローカルLLMサーバ ----
-  ollama:
-    image: ollama/ollama:latest
-    pull_policy: always
-    container_name: ohbook-ollama
-    restart: unless-stopped
+  app:
+    build: .
     ports:
-      - "11434:11434"
+      - "8000:8000"
     volumes:
-      - ollama_data:/root/.ollama
+      - .:/app
     environment:
-      # Aider / Coding Agent用途を想定。
-      # 大きな値ほどメモリ使用量が増えるので、
-      # MacBook Airではまず16k～32k程度から検証する。
-      - OLLAMA_CONTEXT_LENGTH=32768
-
-      # Composeネットワークからもlistenする。
-      - OLLAMA_HOST=0.0.0.0:11434
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 20s
-
-  # ---- AI coding agent ----
-  aider:
-    build:
-      context: .
-      dockerfile: Dockerfile.aider
-    container_name: ohbook-aider
-
-    # `docker compose run aider ...` で対話的に使うため
-    stdin_open: true
-    tty: true
-
-    # Aiderコンテナ内の /app をプロジェクトルートにする
-    working_dir: /app
-
-    # ホスト側のGitリポジトリをそのままAiderから見せる
-    volumes:
-      - ./:/app
-
-    # Mac側のUID/GIDでファイルを作成する
-    user: "${UID:-1000}:${GID:-1000}"
-
-    environment:
-      # Compose上では localhost ではなく
-      # サービス名 `ollama` で接続する
-      OLLAMA_API_BASE: http://ollama:11434
-      AIDER_TIMEOUT: "1800"
-      GH_TOKEN: "${GH_TOKEN}"
-
+      - ENV=development
     depends_on:
-      ollama:
-        condition: service_healthy
+      - db
+
+  db:
+    image: postgres:13
+    environment:
+      - POSTGRES_DB=llm_chat_playbook
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
 
 volumes:
-  ollama_data:
+  db_data:
