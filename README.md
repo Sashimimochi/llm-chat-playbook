@@ -1,17 +1,83 @@
-# Techbookfest
+# LLM Chat Playbook
 
-これはTechbookfest製品のサンプルコードリポジトリです。
+ローカルLLMを使って各種機能を試すサンプルコードリポジトリです。
 
-[サンプルコード](https://techbookfest.org/product/ehw1DzL9T4wn03CTd13VTA?productVariantID=8KicahJwJsrpQXgsnUmQz1)
+[貧弱環境でもここまでやれる Local LLM](https://techbookfest.org/product/ehw1DzL9T4wn03CTd13VTA?productVariantID=8KicahJwJsrpQXgsnUmQz1)に付属のリポジトリでもあります。
 
-[サインイン](/user/signin)
+## System Requirements
 
-[ブログ](https://blog.techbookfest.org/) / [X](https://x.com/techbookfest)
-/ [Techbookfest Androidアプリ](https://play.google.com/store/apps/details?id=org.techbookfest)
-/ [Techbookfest iOSアプリ](https://itunes.apple.com/jp/app/%E6%8A%80%E8%A1%93%E6%9B%B8%E5%85%B8/id1367338964?mt=8)
+|||
+|-|-|
+|CPU|6 Core(Ryzen)|
+|Memory|16GB|
 
-[特定商取引法に基づく表記](/law.html) / [利用規約とポリシー](/terms) /
-[チャットサポート](https://discord.gg/wGfCANs) /
-[お問い合わせ](https://techbookfest.zendesk.com/hc/ja/articles/360052322231)
+## Quick Start
 
-著作権 © 2019-2026 Techbase Co., Ltd. All Rights Reserved.
+```bash
+$ make all
+```
+
+open http://localhost:8503
+
+## Multi Turns Chat
+
+![](./images/chat01.png)
+![](./images/chat02.png)
+![](./images/chat03.png)
+
+### モデル比較
+
+各モデルの特性に応じて、適切なプロンプトフォーマットが自動的に適用されます：
+
+- **Calm2**: `USER:/ASSISTANT:` 形式
+- **DeepSeek, gpt-oss系, Qwen3-4B, Qwen3-4B-Thinking**: ChatML形式 (`<|im_start|>`/`<|im_end|>`)
+- **Swallow, Elayza**: Llama 3形式 (`<|begin_of_text|>`/`<|eot_id|>`)
+
+Calm2
+![](./images/calm2_example.png)
+DeepSeek
+![](./images/deepseek_example.png)
+gpt-oss
+![](./images/gpt_oss_jp_example.png)
+
+## RAG
+
+参考情報を1以上にしてチャットを打つと、閾値以上の類似度のドキュメントがあれば、そのテキストを参照して回答を生成する。
+
+![](./images/rag.png)
+
+### インデックスデータの作成
+
+`data` ディレクトリ配下にインデックスさせたい `.txt` や `.pdf` を配置する。
+
+```bash
+$ tree data/
+data/
+└── easyeasy.txt
+```
+
+Create Indexボタンを押す。
+しばらく待つとインデックスデータが作成される。
+
+![](./images/create_index.png)
+
+※大量のデータやサイズの大きいPDFファイルをインデックスしようとすると、処理に失敗してシステムがクラッシュすることがあるので注意
+
+## Function Calling
+
+ModelタイプでFunctionCallingを選択すると外部APIを呼んで回答を生成する。
+本サンプルコードでは天気APIを参照して、指定した地域の天気を回答する。
+
+![](./images/function_calling.png)
+
+## Released Models
+
+別のモデルを扱いたいときは、以下から選択すると良い。
+すべてのモデルが日本語対応しているわけではないで注意。
+
+https://huggingface.co/models?library=gguf&sort=likes
+
+## Special Thanks
+
+- https://weather.tsukumijima.net/
+- https://easy2.connpass.com/
