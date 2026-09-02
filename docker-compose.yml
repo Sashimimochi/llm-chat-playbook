@@ -1,25 +1,58 @@
-version: '3.8'
-
 services:
-  app:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - .:/app
-    environment:
-      - ENV=development
-    depends_on:
-      - db
+  # ---- ローカルLLMサーバ ----
+  ollama:
+    image: ollama/ollama:latest
+    pull_policy: always
+    container_name: ohbook-ollama
+    restart: unless-stopped
 
-  db:
-    image: postgres:13
-    environment:
-      - POSTGRES_DB=llm_chat_playbook
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "11434:11434"
+
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - ollama_data:/root/.ollama
+
+    environment:
+      # OpenCode / Agent用途を想定
+      - OLLAMA_CONTEXT_LENGTH=32768
+
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # ---- OpenCode ----
+  opencode:
+    build:
+      context: .
+      dockerfile: Dockerfile.opencode
+
+    container_name: ohbook-opencode
+
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+    stdin_open: true
+    tty: true
+
+    working_dir: /workspace
+
+    environment:
+      HOME: /home/opencode
+      XDG_CONFIG_HOME: /home/opencode/.config
+      XDG_DATA_HOME: /home/opencode/.local/share
+      XDG_CACHE_HOME: /home/opencode/.cache
+
+    volumes:
+      # 現在のGitリポジトリ
+      - .:/workspace
+
+      # OpenCodeの状態をDocker volumeに隔離
+      - opencode_home:/home/opencode
 
 volumes:
-  db_data:
+  ollama_data:
+  opencode_home:

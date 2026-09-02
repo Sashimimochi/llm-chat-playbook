@@ -5,3 +5,6 @@ logs/
 vector_store/
 __pycache__/
 *.whl
+.aider*
+.env
+.vscode/
