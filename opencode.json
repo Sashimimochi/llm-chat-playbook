@@ -59,14 +59,15 @@
       "git status": "allow",
       "git add": "allow",
       "git commit": "allow",
-      "git push": "ask",
+      "git push": "allow",
       "git pull": "allow",
       "git clone": "allow",
       "git checkout": "allow",
       "git branch": "allow",
       "git merge": "ask",
       "git log": "allow",
-      "git diff": "allow"
+      "git diff": "allow",
+      "gh *": "allow"
     }
   },
   "agent": {
@@ -82,7 +83,7 @@
     },
     "plan": {
       "mode": "primary",
-      "prompt": "{file:./skills/create-pr/SKILL.md}",
+      "prompt": "{file:./skills/SKILL.md}",
       "tools": {
         "read": true,
         "write": true,

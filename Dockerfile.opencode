@@ -2,10 +2,11 @@ FROM ghcr.io/anomalyco/opencode:1.18.17
 
 USER root
 
+RUN apk update
+
 RUN apk add --no-cache \
-  git \
-  bash \
-  curl
+  git bash curl \
+  github-cli openssh python3
 
 # OpenCodeをrootで動かさない
 RUN addgroup -g 1000 opencode \
