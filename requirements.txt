@@ -62,6 +62,7 @@ nvidia-nccl-cu12==2.27.3
 nvidia-nvjitlink-cu12==12.8.93
 nvidia-nvtx-cu12==12.8.90
 orjson==3.11.6
+ollama==0.6.0
 packaging==24.2
 pandas==2.3.2
 pillow==12.3.0
