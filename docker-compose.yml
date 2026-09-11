@@ -6,8 +6,6 @@ services:
     pull_policy: always
     container_name: ohbook-ollama
     restart: unless-stopped
-    command: >
-      /bin/sh -c "ollama pull gemma4:e2b && ollama pull gemma4:e4b"
     ports:
       - "11434:11434"
     volumes:
@@ -15,7 +13,6 @@ services:
     environment:
       # OpenCode / Agent用途を想定
       - OLLAMA_CONTEXT_LENGTH=32768
-
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
