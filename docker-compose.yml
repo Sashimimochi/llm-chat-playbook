@@ -20,35 +20,64 @@ services:
       retries: 12
       start_period: 20s
 
+  # ---- Ollamaモデル初期化 ----
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ohbook-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      INIT_MODELS: ${OLLAMA_INIT_MODELS}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+
+        set -- $${INIT_MODELS}
+
+        while [ "$$#" -gt 0 ]; do
+          model="$$1"
+          shift
+
+          if ollama list | awk 'NR > 1 {print $$1}' | grep -Fxq "$$model"; then
+            echo "$$model already exists."
+          else
+            echo "Pulling $$model..."
+            ollama pull "$$model"
+          fi
+        done
+
   # ---- OpenCode ----
   opencode:
     build:
       context: .
       dockerfile: Dockerfile.opencode
-
     container_name: ohbook-opencode
-
     depends_on:
       ollama:
         condition: service_healthy
-
     stdin_open: true
     tty: true
-
     working_dir: /workspace
-
+    group_add:
+      - "0"
     environment:
       HOME: /home/opencode
       XDG_CONFIG_HOME: /home/opencode/.config
       XDG_DATA_HOME: /home/opencode/.local/share
       XDG_CACHE_HOME: /home/opencode/.cache
-
+      SSH_AUTH_SOCK: /run/host-services/ssh-auth.sock
+      GIT_CONFIG_GLOBAL: /tmp/host-gitconfig
     volumes:
-      # 現在のGitリポジトリ
       - .:/workspace
-
-      # OpenCodeの状態をDocker volumeに隔離
       - opencode_home:/home/opencode
+      - ${HOME}/.gitconfig:/tmp/host-gitconfig:ro
+      - ${HOME}/.ssh/known_hosts:/home/opencode/.ssh/known_hosts:ro
+      - /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock
 
 volumes:
   ollama_data:
