@@ -4,7 +4,6 @@ model/
 logs/
 vector_store/
 __pycache__/
-*.whl
-.aider*
+.gitconfig
 .env
 .vscode/

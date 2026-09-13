@@ -17,6 +17,8 @@ RUN addgroup -g 1000 opencode \
   /home/opencode/.cache \
   && chown -R opencode:opencode /home/opencode
 
+COPY .gitconfig /tmp/host-gitconfig
+
 USER opencode
 
 ENV HOME=/home/opencode \

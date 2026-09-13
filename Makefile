@@ -4,6 +4,7 @@ setup:
 launch:
 	docker-compose up -d ollama llm
 	docker-compose run --rm ollama-init
+	cp ~/.gitconfig .gitconfig
 	docker-compose run --rm opencode
 	open http://localhost:8503
 

@@ -83,7 +83,6 @@ x-opencode-service: &opencode-service
   volumes:
     - .:/workspace
     - opencode_home:/home/opencode
-    - ${HOME}/.gitconfig:/tmp/host-gitconfig:ro
     - ${HOME}/.ssh/known_hosts:/home/opencode/.ssh/known_hosts:ro
     - /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock
 
