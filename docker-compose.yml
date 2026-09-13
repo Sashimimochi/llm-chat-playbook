@@ -1,83 +1,108 @@
-services:
-  # ---- ローカルLLMサーバ ----
+# ---- ローカルLLMサーバ ----
+x-llm-service: &llm-service
+  build:
+    context: .
+    dockerfile: Dockerfile.llm
+  container_name: llm
+  command: ["streamlit", "run", "app.py", "--server.port=8053"]
+  environment:
+    TZ: Asia/Tokyo
+  volumes:
+    - .:/projects
+  ports:
+    - "8053:8053"
 
-  ollama:
-    image: ollama/ollama:latest
-    pull_policy: always
-    container_name: ohbook-ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      # OpenCode / Agent用途を想定
-      - OLLAMA_CONTEXT_LENGTH=32768
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 20s
+x-ollama-service: &ollama-service
+  image: ollama/ollama:latest
+  pull_policy: always
+  restart: unless-stopped
+  ports:
+    - "11434:11434"
+  volumes:
+    - ollama_data:/root/.ollama
+  environment:
+    # OpenCode / Agent用途を想定
+    - OLLAMA_CONTEXT_LENGTH=32768
+  healthcheck:
+    test: ["CMD", "ollama", "list"]
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    start_period: 20s
 
-  # ---- Ollamaモデル初期化 ----
-  ollama-init:
-    image: ollama/ollama:latest
-    container_name: ohbook-ollama-init
-    depends_on:
-      ollama:
-        condition: service_healthy
-    volumes:
-      - ollama_data:/root/.ollama
-    environment:
-      OLLAMA_HOST: http://ollama:11434
-      INIT_MODELS: ${OLLAMA_INIT_MODELS}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -eu
+# ---- Ollamaモデル初期化 ----
+x-ollama-init: &ollama-init-service
+  image: ollama/ollama:latest
+  depends_on:
+    ollama:
+      condition: service_healthy
+  volumes:
+    - ollama_data:/root/.ollama
+  environment:
+    OLLAMA_HOST: http://ollama:11434
+    INIT_MODELS: ${OLLAMA_INIT_MODELS}
+  entrypoint: ["/bin/sh", "-c"]
+  command:
+    - |
+      set -eu
 
-        set -- $${INIT_MODELS}
+      set -- $${INIT_MODELS}
 
-        while [ "$$#" -gt 0 ]; do
-          model="$$1"
-          shift
+      while [ "$$#" -gt 0 ]; do
+        model="$$1"
+        shift
 
-          if ollama list | awk 'NR > 1 {print $$1}' | grep -Fxq "$$model"; then
-            echo "$$model already exists."
-          else
-            echo "Pulling $$model..."
-            ollama pull "$$model"
-          fi
-        done
+        if ollama list | awk 'NR > 1 {print $$1}' | grep -Fxq "$$model"; then
+          echo "$$model already exists."
+        else
+          echo "Pulling $$model..."
+          ollama pull "$$model"
+        fi
+      done
 
   # ---- OpenCode ----
+x-opencode-service: &opencode-service
+  build:
+    context: .
+    dockerfile: Dockerfile.opencode
+  depends_on:
+    ollama:
+      condition: service_healthy
+  stdin_open: true
+  tty: true
+  working_dir: /workspace
+  group_add:
+    - "0"
+  environment:
+    HOME: /home/opencode
+    XDG_CONFIG_HOME: /home/opencode/.config
+    XDG_DATA_HOME: /home/opencode/.local/share
+    XDG_CACHE_HOME: /home/opencode/.cache
+    SSH_AUTH_SOCK: /run/host-services/ssh-auth.sock
+    GIT_CONFIG_GLOBAL: /tmp/host-gitconfig
+  volumes:
+    - .:/workspace
+    - opencode_home:/home/opencode
+    - ${HOME}/.gitconfig:/tmp/host-gitconfig:ro
+    - ${HOME}/.ssh/known_hosts:/home/opencode/.ssh/known_hosts:ro
+    - /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock
+
+services:
+  llm:
+    <<: *llm-service
+    container_name: llm
+
+  ollama:
+    <<: *ollama-service
+    container_name: ollama
+
+  ollama-init:
+    <<: *ollama-init-service
+    container_name: ollama-init
+
   opencode:
-    build:
-      context: .
-      dockerfile: Dockerfile.opencode
-    container_name: ohbook-opencode
-    depends_on:
-      ollama:
-        condition: service_healthy
-    stdin_open: true
-    tty: true
-    working_dir: /workspace
-    group_add:
-      - "0"
-    environment:
-      HOME: /home/opencode
-      XDG_CONFIG_HOME: /home/opencode/.config
-      XDG_DATA_HOME: /home/opencode/.local/share
-      XDG_CACHE_HOME: /home/opencode/.cache
-      SSH_AUTH_SOCK: /run/host-services/ssh-auth.sock
-      GIT_CONFIG_GLOBAL: /tmp/host-gitconfig
-    volumes:
-      - .:/workspace
-      - opencode_home:/home/opencode
-      - ${HOME}/.gitconfig:/tmp/host-gitconfig:ro
-      - ${HOME}/.ssh/known_hosts:/home/opencode/.ssh/known_hosts:ro
-      - /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock
+    <<: *opencode-service
+    container_name: opencode
 
 volumes:
   ollama_data:

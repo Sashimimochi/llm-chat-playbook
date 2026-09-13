@@ -2,7 +2,9 @@ setup:
 	sh setup.sh
 
 launch:
-	docker compose up -d
+	docker-compose up -d ollama llm
+	docker-compose run --rm ollama-init
+	docker-compose run --rm opencode
 	open http://localhost:8503
 
 all:
