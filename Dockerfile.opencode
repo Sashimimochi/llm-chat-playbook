@@ -17,9 +17,11 @@ RUN addgroup -g 1000 opencode \
   /home/opencode/.cache \
   && chown -R opencode:opencode /home/opencode
 
+USER opencode
+
 COPY .gitconfig /tmp/host-gitconfig
 
-USER opencode
+RUN git config --global --add safe.directory /workspace
 
 ENV HOME=/home/opencode \
   XDG_CONFIG_HOME=/home/opencode/.config \
