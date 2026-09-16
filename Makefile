@@ -26,3 +26,4 @@ clean:
 	@make down
 	docker system prune -f
 	rm -rf ./model ./data ./logs ./vector_store
+	rm .gitconfig
