@@ -75,7 +75,7 @@
     },
     "plan": {
       "mode": "primary",
-      "prompt": "{file:./skills/SKILL.md}",
+      "prompt": "日本語で出力してください。",
       "tools": {
         "read": true,
         "write": true,
