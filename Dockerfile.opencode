@@ -1,0 +1,31 @@
+FROM ghcr.io/anomalyco/opencode:1.18.17
+
+USER root
+
+RUN apk update
+
+RUN apk add --no-cache \
+  git bash curl \
+  github-cli openssh python3
+
+# OpenCodeをrootで動かさない
+RUN addgroup -g 1000 opencode \
+  && adduser -D -u 1000 -G opencode opencode \
+  && mkdir -p \
+  /home/opencode/.config \
+  /home/opencode/.local/share \
+  /home/opencode/.cache \
+  && chown -R opencode:opencode /home/opencode
+
+COPY .gitconfig /tmp/host-gitconfig
+
+ENV GIT_CONFIG_GLOBAL=/tmp/host-gitconfig
+
+RUN chmod +x /tmp/host-gitconfig && git config --global --add safe.directory /workspace
+
+USER opencode
+
+ENV HOME=/home/opencode \
+  XDG_CONFIG_HOME=/home/opencode/.config \
+  XDG_DATA_HOME=/home/opencode/.local/share \
+  XDG_CACHE_HOME=/home/opencode/.cache
