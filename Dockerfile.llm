@@ -18,4 +18,6 @@ RUN pip install --upgrade pip && \
 
 # ビルド時にライブラリをインストールするとき
 COPY ./requirements.txt .
+RUN pip install torch==2.13.0 \
+    --index-url https://download.pytorch.org/whl/cu130
 RUN pip install -r requirements.txt

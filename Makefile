@@ -1,5 +1,5 @@
 REAL_USER := $(if $(SUDO_USER),$(SUDO_USER),$(USER))
-REAL_HOME := $(shell getent passwd $(REAL_USER) | cut -d: -f6)
+REAL_HOME := $(shell eval echo ~$(REAL_USER))
 
 setup:
 	bash setup.sh
