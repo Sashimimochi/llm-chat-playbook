@@ -14,7 +14,6 @@ x-llm-service: &llm-service
 
 x-ollama-service: &ollama-service
   image: ollama/ollama:latest
-  pull_policy: always
   restart: unless-stopped
   ports:
     - "11434:11434"
