@@ -2,6 +2,13 @@
 
 ローカルLLMを使ってチャット、RAG、Function Callingを試すサンプルコードです。LLMの推論にはOllamaを利用します。
 
+## 書籍版のコード
+
+- **最新版（2026年版以降）**: [mainブランチ](https://github.com/Sashimimochi/llm-chat-playbook/tree/main)
+- **2024年版**: [GitHub Releases](https://github.com/Sashimimochi/llm-chat-playbook/releases) の `book-2024` を参照してください。現在、配布コードと一致するコミットの照合が必要なため、旧版リリースは公開準備中です。
+
+書籍公開時点のコードは専用タグで固定し、公開済みタグの付け替えは行いません。
+
 ## Quick Start
 
 DockerとDocker Composeが利用できる環境で、次を実行します。

@@ -8,6 +8,11 @@ on:
       - "Dockerfile.llm"
       - "requirements.txt"
       - "docker-compose.yml"
+      - "app.py"
+      - "setup.sh"
+      - "utils/ollama_client.py"
+      - "tests/**"
+      - "README.md"
       - ".github/workflows/docker-build-check.yml"
 
 jobs:
@@ -31,6 +36,16 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Test Ollama API client
+        run: |
+          python -m pip install --upgrade pip requests
+          python -m unittest discover -s tests -v
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
