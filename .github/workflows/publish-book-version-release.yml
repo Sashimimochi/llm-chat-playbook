@@ -1,0 +1,106 @@
+name: Publish Book Version Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "書籍版タグ"
+        required: true
+        type: choice
+        options:
+          - book-2024
+          - book-2026
+      target_sha:
+        description: "配布コードと照合済みのコミットSHA（40桁）"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate requested snapshot
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+
+          case "$TAG_NAME" in
+            book-2024|book-2026) ;;
+            *)
+              echo "::error::Unsupported book tag: $TAG_NAME"
+              exit 1
+              ;;
+          esac
+
+          if ! [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::target_sha must be a full 40-character lowercase commit SHA."
+            exit 1
+          fi
+
+          if ! git cat-file -e "${TARGET_SHA}^{commit}" 2>/dev/null; then
+            echo "::error::The requested commit is not present in the checked-out repository history."
+            exit 1
+          fi
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "::error::A release named $TAG_NAME already exists. Published releases must not be replaced."
+            exit 1
+          fi
+
+      - name: Create tag without moving published refs
+        env:
+          TAG_NAME: ${{ inputs.tag_name }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG_NAME" >/dev/null 2>&1; then
+            git fetch --no-tags origin "refs/tags/$TAG_NAME:refs/tags/$TAG_NAME"
+            existing_target="$(git rev-list -n 1 "$TAG_NAME")"
+            if [ "$existing_target" != "$TARGET_SHA" ]; then
+              echo "::error::Tag $TAG_NAME already points to $existing_target, not $TARGET_SHA. It will not be moved."
+              exit 1
+            fi
+            echo "Tag already points to the requested commit; continuing only to create the missing release."
+          else
+            case "$TAG_NAME" in
+              book-2024) tag_message="2024年版の配布コード" ;;
+              book-2026) tag_message="2026年版の配布コード" ;;
+            esac
+            git tag -a "$TAG_NAME" "$TARGET_SHA" -m "$tag_message"
+            git push origin "$TAG_NAME"
+          fi
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ inputs.tag_name }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+
+          case "$TAG_NAME" in
+            book-2024)
+              release_title="2024年版 書籍掲載コード"
+              release_notes="2024年版の書籍掲載コードを固定したアーカイブです。\n\nSnapshot commit: $TARGET_SHA\n\nこのタグは書籍配布物との照合結果に基づいて作成されました。公開後にタグを付け替えないでください。"
+              ;;
+            book-2026)
+              release_title="2026年版 書籍掲載コード"
+              release_notes="2026年版の書籍掲載コードを固定したアーカイブです。\n\nSnapshot commit: $TARGET_SHA\n\n公開後にタグを付け替えないでください。"
+              ;;
+          esac
+
+          gh release create "$TAG_NAME" \
+            --verify-tag \
+            --title "$release_title" \
+            --notes "$(printf '%b' "$release_notes")"
