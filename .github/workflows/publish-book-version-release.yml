@@ -29,6 +29,7 @@ jobs:
 
       - name: Validate requested snapshot
         env:
+          GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ inputs.tag_name }}
           TARGET_SHA: ${{ inputs.target_sha }}
         run: |
