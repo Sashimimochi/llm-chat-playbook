@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+import json
+import unittest
+from unittest.mock import Mock, patch
+
+from utils.ollama_client import OllamaClient, OllamaClientError
+
+
+class OllamaClientTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = OllamaClient("http://ollama:11434")
+
+    @patch("utils.ollama_client.requests.get")
+    def test_list_models_returns_sorted_names(self, mocked_get: Mock) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "models": [{"name": "qwen3:4b"}, {"name": "gemma4:e2b"}]
+        }
+        mocked_get.return_value = response
+
+        self.assertEqual(
+            self.client.list_models(),
+            ["gemma4:e2b", "qwen3:4b"],
+        )
+        mocked_get.assert_called_once_with(
+            "http://ollama:11434/api/tags", timeout=5
+        )
+
+    @patch("utils.ollama_client.requests.post")
+    def test_chat_passes_options_and_tools(self, mocked_post: Mock) -> None:
+        response = Mock()
+        response.json.return_value = {
+            "message": {"role": "assistant", "content": "こんにちは"}
+        }
+        mocked_post.return_value = response
+        tools = [{"type": "function", "function": {"name": "location_weather"}}]
+        messages = [{"role": "user", "content": "東京の天気"}]
+
+        result = self.client.chat(
+            model="gemma4:e2b",
+            messages=messages,
+            options={"temperature": 0.7},
+            tools=tools,
+        )
+
+        self.assertEqual(result["content"], "こんにちは")
+        kwargs = mocked_post.call_args.kwargs
+        self.assertEqual(kwargs["json"]["messages"], messages)
+        self.assertEqual(kwargs["json"]["tools"], tools)
+        self.assertFalse(kwargs["json"]["stream"])
+
+    @patch("utils.ollama_client.requests.post")
+    def test_stream_chat_yields_cumulative_text(self, mocked_post: Mock) -> None:
+        response = Mock()
+        response.iter_lines.return_value = [
+            json.dumps({"message": {"content": "Hello"}}).encode(),
+            json.dumps({"message": {"content": " world"}}).encode(),
+        ]
+        mocked_post.return_value = response
+
+        result = list(
+            self.client.stream_chat(
+                model="gemma4:e2b",
+                messages=[{"role": "user", "content": "Hi"}],
+                options={},
+            )
+        )
+
+        self.assertEqual(result, ["Hello", "Hello world"])
+        self.assertTrue(mocked_post.call_args.kwargs["stream"])
+        response.close.assert_called_once()
+
+    @patch("utils.ollama_client.requests.get")
+    def test_list_models_wraps_connection_errors(self, mocked_get: Mock) -> None:
+        import requests
+
+        mocked_get.side_effect = requests.ConnectionError("unavailable")
+        with self.assertRaises(OllamaClientError):
+            self.client.list_models()
+
+
+if __name__ == "__main__":
+    unittest.main()

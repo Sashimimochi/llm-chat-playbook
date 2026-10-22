@@ -1,460 +1,299 @@
 import json
+import logging
 import os
 import re
+from datetime import datetime
+from typing import Any
+
 import requests
 import streamlit as st
-from datetime import datetime
-from utils.mylogger import getLogger, set_logger
-from llama_cpp import Llama
+
 from utils.indexer import create_index, load_index, tokenize
+from utils.mylogger import getLogger, set_logger
+from utils.ollama_client import OllamaClient, OllamaClientError
+
 set_logger()
 logger = getLogger(__file__)
 
-if "conversation" not in st.session_state:
-    st.session_state.conversation = []
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+MAX_CONTEXT_TOKENS = 4096
+DEFAULT_SYSTEM_PROMPT = (
+    "あなたはユーザーの質問に答える日本語のAIアシスタントです。"
+    "正確で分かりやすい回答をしてください。"
+)
 
-MODEL_DIR="./model"
 
-MODEL_LIST = {
-    "Calm2": {
-        "repo_id": "TheBloke/calm2-7B-chat-GGUF",
-        "filename": "calm2-7b-chat.Q5_K_M.gguf",
-        "chat_format": None,
-        "prompt_format": "calm2",
-        "hide_thinking": False
-    },
-    "DeepSeek": {
-        "repo_id": "mmnga/cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-gguf",
-        "filename": "cyberagent-DeepSeek-R1-Distill-Qwen-14B-Japanese-Q4_K_M.gguf",
-        "chat_format": None,
-        "prompt_format": "chatml",
-        "hide_thinking": False
-    },
-    "gpt-oss": {
-        "repo_id": "unsloth/gpt-oss-20b-GGUF",
-        "filename": "gpt-oss-20b-Q4_K_M.gguf",
-        "chat_format": None,
-        "prompt_format": "chatml",
-        "hide_thinking": False
-    },
-    "gpt-oss-jp": {
-        "repo_id": "Rakushaking/unsloth-gpt-oss-jp-reasoning-finetuned",
-        "filename": "gpt-oss-jp-reasoning-finetuned-20250827-142614.gguf",
-        "chat_format": None,
-        "prompt_format": "chatml",
-        "hide_thinking": False
-    },
-    "Swallow": {
-        "repo_id": "mmnga/Llama-3.1-Swallow-8B-Instruct-v0.5-gguf",
-        "filename": "Llama-3.1-Swallow-8B-Instruct-v0.5-Q4_K_M.gguf",
-        "chat_format": None,
-        "prompt_format": "llama3",
-        "hide_thinking": False
-    },
-    "Elayza": {
-        "repo_id": "elyza/Llama-3-ELYZA-JP-8B-GGUF",
-        "filename": "Llama-3-ELYZA-JP-8B-q4_k_m.gguf",
-        "chat_format": None,
-        "prompt_format": "llama3",
-        "hide_thinking": False
-    },
-    "Qwen3-4B": {
-        "repo_id": "lmstudio-community/Qwen3-4B-Instruct-2507-GGUF",
-        "filename": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
-        "chat_format": None,
-        "prompt_format": "chatml",
-        "hide_thinking": False
-    },
-    "Qwen3-4B-Thinking": {
-        "repo_id": "lmstudio-community/Qwen3-4B-Thinking-2507-GGUF",
-        "filename": "Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
-        "chat_format": None,
-        "prompt_format": "chatml",
-        "hide_thinking": True
-    },
-    "FunctionCalling-ja": {
-        "repo_id": "TheBloke/calm2-7B-chat-GGUF",
-        "filename": "calm2-7b-chat.Q5_K_M.gguf",
-        "chat_format": "chatml-function-calling",
-        "prompt_format": "calm2",
-        "hide_thinking": False
-    },
-    "FunctionCalling-en": {
-        "repo_id": "",
-        "filename": "",
-        "chat_format": "chatml-function-calling",
-        "prompt_format": "calm2",
-        "hide_thinking": False
-    },
-}
+def remove_thinking_tags(text: str) -> str:
+    """Remove complete reasoning tags from model output when requested."""
+    text = re.sub(r"<thinking>.*?</thinking>", "", text, flags=re.DOTALL)
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    return re.sub(r"\n\s*\n+", "\n\n", text).strip()
 
-def remove_thinking_tags(text):
-    """
-    思考プロセスのタグを削除する
-    <thinking>...</thinking> または <think>...</think> タグとその内容を削除
-    """
-    # <thinking> または <think> タグとその内容を削除
-    thinking_patterns = [
-        r'<thinking>.*?</thinking>',
-        r'<think>.*?</think>'
-    ]
-    
-    cleaned_text = text
-    for pattern in thinking_patterns:
-        cleaned_text = re.sub(pattern, '', cleaned_text, flags=re.DOTALL)
-    
-    # 複数の連続した改行を1つにまとめる
-    cleaned_text = re.sub(r'\n\s*\n+', '\n\n', cleaned_text)
-    
-    # 前後の空白を削除
-    cleaned_text = cleaned_text.strip()
-    
-    return cleaned_text
 
 class LLM:
     def __init__(
         self,
-        search_type = "similarity_score_threshold",
-        score_threshold = 0.8,
-        window_size = 10
-    ):
-        self.MAX_TOKENS = 2048
+        search_type: str = "similarity_score_threshold",
+        score_threshold: float = 0.8,
+        window_size: int = 10,
+    ) -> None:
+        self.client = OllamaClient(OLLAMA_BASE_URL)
         self.search_type = search_type
         self.score_threshold = score_threshold
         self.search_num = 5
         self.window_size = window_size
 
-    def vector_search(self, query, top_k=1):
+    def vector_search(self, query: str, top_k: int = 1):
         vector_store = load_index()
         if vector_store is None:
             return None
+
         keywords = tokenize(query)
         retriever = vector_store.as_retriever(
             search_type=self.search_type,
-            search_kwargs={
-                "score_threshold": self.score_threshold
-            }
+            search_kwargs={"score_threshold": self.score_threshold},
         )
         context_docs = retriever.get_relevant_documents(query, k=self.search_num)
-        if len(context_docs) == 0:
+        if not context_docs:
             logger.warning("No documents hit.")
             return None
+
         logger.debug(keywords)
         for doc in context_docs:
             logger.debug(doc.metadata.get("kw"))
-        res = [doc for doc in context_docs if all(x in keywords for x in doc.metadata.get("kw"))]
-        logger.warning("No documents hit exactly.")
-        return res[:top_k] if len(res) > 0 else context_docs[:top_k]
+        exact_matches = [
+            doc
+            for doc in context_docs
+            if all(keyword in keywords for keyword in doc.metadata.get("kw", []))
+        ]
+        return exact_matches[:top_k] if exact_matches else context_docs[:top_k]
 
-    def load_model(self, model_name):
-        local_path = os.path.join(MODEL_DIR, MODEL_LIST[model_name].get("filename"))
-        if os.path.exists(local_path):
-            return self.load_model_from_local(local_path)
-        else:
-            return self.load_model_from_remote(model_name)
+    def get_location_codes(self) -> dict[str, str]:
+        with open("data/cities.json", encoding="utf-8") as city_file:
+            return json.load(city_file)
 
-    @st.cache_resource
-    def load_model_from_local(_self, model_path):
-        llm = Llama(model_path, n_ctx=_self.MAX_TOKENS)
-        return llm
-
-    @st.cache_resource
-    def load_model_from_remote(_self, model_name):
-        model = MODEL_LIST[model_name]
-        llm = Llama.from_pretrained(
-            repo_id = model["repo_id"],
-            filename = model["filename"],
-            verbose = False,
-            n_ctx = _self.MAX_TOKENS,
-            chat_format = model["chat_format"]
-        )
-        return llm
-
-    def get_prompt_format(self, model_name):
-        """モデルに応じたプロンプトフォーマットを取得"""
-        return MODEL_LIST[model_name].get("prompt_format", "calm2")
-
-    def format_prompt(self, model_name, user_message, context=None):
-        """モデル別のプロンプトフォーマットに変換"""
-        prompt_format = self.get_prompt_format(model_name)
-
-        if context:
-            # RAGを使う場合
-            if prompt_format == "chatml":
-                template = """<|im_start|>system
-あなたはユーザーの質問に答えるAIアシスタントBotです。
-ユーザーの質問に対して適切なアドバイスを答えます。
-情報として、以下の内容を参考にしてください。
-====
-{context}
-====<|im_end|>
-<|im_start|>user
-{user_message}<|im_end|>
-<|im_start|>assistant
-""".format(user_message=user_message, context=context)
-            elif prompt_format == "llama3":
-                template = """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-あなたはユーザーの質問に答えるAIアシスタントBotです。
-ユーザーの質問に対して適切なアドバイスを答えます。
-情報として、以下の内容を参考にしてください。
-====
-{context}
-====<|eot_id|><|start_header_id|>user<|end_header_id|>
-
-{user_message}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-""".format(user_message=user_message, context=context)
-            else:  # calm2
-                template = """USER: あなたはユーザーの質問に答えるAIアシスタントBotです。
-ユーザーの質問に対して適切なアドバイスを答えます。
-情報として、以下の内容を参考にしてください。
-====
-{context}
-====
-さて、「{user_message}」という質問に対して、上記の情報をもとに、答えを考えてみましょう。
-ASSISTANT:
-""".format(user_message=user_message, context=context)
-        else:
-            # RAGを使わない場合
-            if prompt_format == "chatml":
-                template = """<|im_start|>user
-{user_message}<|im_end|>
-<|im_start|>assistant
-""".format(user_message=user_message)
-            elif prompt_format == "llama3":
-                template = """<|begin_of_text|><|start_header_id|>user<|end_header_id|>
-
-{user_message}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-
-""".format(user_message=user_message)
-            else:  # calm2
-                template = """USER: {user_message} ASSISTANT: """.format(user_message=user_message)
-
-        return template
-
-    def get_stop_tokens(self, model_name):
-        """モデル別のストップトークンを取得"""
-        prompt_format = self.get_prompt_format(model_name)
-
-        if prompt_format == "chatml":
-            return ["<|im_start|>", "<|im_end|>"]
-        elif prompt_format == "llama3":
-            return ["<|eot_id|>", "<|end_of_text|>"]
-        else:  # calm2
-            return ["SYSTEM:", "USER:", "ASSISTANT:"]
-
-    def on_input_change(self, model_name, top_k=1, temperature=0.7, top_p=0.3, top_k_param=20, repeat_penalty=1.1, max_tokens=None):
-        user_message = f"{st.session_state.user_message}"
-        logger.info(f"user message:{user_message}")
-        docs = self.vector_search(user_message, top_k=top_k)
-        if docs:
-            context = "\n".join([doc.page_content for doc in docs])
-            urls = [doc.metadata.get("url") for doc in docs]
-            if len(context) > self.MAX_TOKENS * 1.2:
-                context = context[:int(self.MAX_TOKENS * 1.2)]
-            template = self.format_prompt(model_name, user_message, context)
-        else:
-            template = self.format_prompt(model_name, user_message)
-            urls = []
-        st.session_state.conversation.append(template)
-        prompt = "\n".join(st.session_state.conversation[-self.window_size * 3 + 1:])
-        msg = ""
-        for msg in self.generate(model_name, prompt, temperature, top_p, top_k_param, repeat_penalty, max_tokens):
-            yield msg
-        else:
-            st.session_state.urls = urls
-            st.session_state.conversation.append(msg)
-
-    def generate(self, model_name, prompt, temperature=0.7, top_p=0.3, top_k=20, repeat_penalty=1.1, max_tokens=None):
-        if MODEL_LIST[model_name]["chat_format"] == "chatml-function-calling":
-            prompt = self.generate_by_fc(model_name, prompt)
-        return self.generate_chat(model_name, prompt, temperature, top_p, top_k, repeat_penalty, max_tokens)
-
-    def generate_chat(self, model_name, prompt, temperature=0.7, top_p=0.3, top_k=20, repeat_penalty=1.1, max_tokens=None):
-        llm = self.load_model(model_name)
-        logger.info(f"prompt for model: {prompt}")
-        if max_tokens is None:
-            max_tokens = self.MAX_TOKENS
-        stop_tokens = self.get_stop_tokens(model_name)
-        streamer = llm(
-            prompt,
-            temperature=temperature,
-            top_p=top_p,
-            top_k=top_k,
-            repeat_penalty=repeat_penalty,
-            max_tokens=max_tokens,
-            stop=stop_tokens,
-            stream=True
-        )
-        partial_message = ""
-        hide_thinking = MODEL_LIST[model_name].get("hide_thinking", False)
-        
-        for msg in streamer:
-            partial_message += msg.get("choices")[0].get("text")
-            
-            # Thinking モデルの場合、思考タグを除去して表示
-            if hide_thinking:
-                display_message = remove_thinking_tags(partial_message)
-                yield display_message
-            else:
-                yield partial_message
-        
-        # ストリーミング終了後、完全な出力をログに保存（Thinkingモデルの場合）
-        if hide_thinking:
-            logger.info(f"Full output with thinking: {partial_message}")
-
-    def get_location_codes(self):
-        with open("data/cities.json") as f:
-            location_codes = json.load(f)
-        return location_codes
-
-    def location_weather(self, location):
-        location_codes = self.get_location_codes()
-        city_code = location_codes.get(location)
+    def location_weather(self, location: str) -> str:
+        city_code = self.get_location_codes().get(location)
         if city_code is None:
-            return f"申し訳ありませんが、その地域の天気は取得できませんでした。取得可能な地域は以下の通りです。{list(location_codes.keys())}"
+            cities = "、".join(self.get_location_codes().keys())
+            return (
+                f"申し訳ありませんが「{location}」の天気は取得できませんでした。"
+                f"取得可能な地域は以下の通りです: {cities}"
+            )
+
         url = f"https://weather.tsukumijima.net/api/forecast?city={city_code}"
-        resp = requests.get(url).json()
-        msg = f"{resp['title']}の{resp['description']['publicTimeFormatted']}の天気は{resp['description']['text']}"
-        return msg
+        response = requests.get(url, timeout=15)
+        response.raise_for_status()
+        forecast = response.json()
+        title = forecast.get("title", location)
+        description = forecast.get("description", {}).get("text", "天気情報がありません")
+        published = forecast.get("description", {}).get("publicTimeFormatted", "")
+        return f"{title}の{published}の天気は{description}"
 
-    def build_tools(self):
-        tools = [{
-            "type": "function",
-            "function": {
-                "name": "location_weather",
-                "parameters": {
-                    "type": "object",
-                    "title": "location_weather",
-                    "properties": {
-                        "location": {
-                            "title": "Location",
-                            "type": "string"
-                        }
+    def build_tools(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "type": "function",
+                "function": {
+                    "name": "location_weather",
+                    "description": "日本の指定された地域の天気予報を取得します。",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location": {
+                                "type": "string",
+                                "description": "天気を調べたい地域名。例: 東京、横浜、大阪",
+                            }
+                        },
+                        "required": ["location"],
                     },
-                    "required": [ "location" ]
-                }
-            }
-        }]
-        return tools
-
-    def build_tool_choice(self):
-        tool_choice = {
-            "type": "function",
-            "function": {
-                "name": "location_weather"
-            }
-        }
-        return tool_choice
-
-    def generate_by_fc(self, model_name, prompt):
-        llm = self.load_model(model_name)
-        output = llm.create_chat_completion(
-            messages = [
-                {
-                    "role": "system",
-                    "content": f"A chat between a curious user and an artificial intelligence assistant. The assistant gives helpful, detailed, and polite answers to the user's questions/ The assistant calls functions with appropriate input when necessary. 抽出結果は日本語にしてくください。抽出結果は可能な限り次のいずれかに寄せてください。{self.get_location_codes().keys()}"
                 },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            tools = self.build_tools(),
-            tool_choice = self.build_tool_choice()
+            }
+        ]
+
+    def build_options(
+        self,
+        temperature: float,
+        top_p: float,
+        top_k: int,
+        repeat_penalty: float,
+        max_tokens: int | None,
+    ) -> dict[str, Any]:
+        return {
+            "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+            "repeat_penalty": repeat_penalty,
+            "num_predict": max_tokens or 2048,
+            "num_ctx": MAX_CONTEXT_TOKENS,
+        }
+
+    def build_messages(self, user_message: str, context: str | None = None):
+        system_content = DEFAULT_SYSTEM_PROMPT
+        if context:
+            system_content += (
+                "\n\n回答の参考情報は以下です。参考情報にない内容は推測せず、"
+                "必要に応じて情報がないことを説明してください。\n"
+                "====\n"
+                f"{context}\n"
+                "===="
+            )
+
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": system_content}
+        ]
+        # The last entry is the current user message, already added by main().
+        history = st.session_state.messages[:-1]
+        history = [
+            {"role": item["role"], "content": item["content"]}
+            for item in history
+            if item.get("role") in {"user", "assistant"} and item.get("content")
+        ]
+        if self.window_size > 0:
+            history = history[-self.window_size * 2 :]
+        else:
+            history = []
+        messages.extend(history)
+        messages.append({"role": "user", "content": user_message})
+        return messages
+
+    def run_tool(self, name: str, arguments: Any) -> str:
+        if isinstance(arguments, str):
+            arguments = json.loads(arguments)
+        if name != "location_weather":
+            raise ValueError(f"Unsupported tool: {name}")
+        if not isinstance(arguments, dict) or not isinstance(
+            arguments.get("location"), str
+        ):
+            raise ValueError("location_weather requires a string location.")
+        return self.location_weather(arguments["location"])
+
+    def on_input_change(
+        self,
+        model_name: str,
+        top_k: int = 1,
+        temperature: float = 0.7,
+        top_p: float = 0.3,
+        top_k_param: int = 20,
+        repeat_penalty: float = 1.1,
+        max_tokens: int | None = None,
+        use_function_calling: bool = False,
+        hide_thinking: bool = False,
+    ):
+        user_message = str(st.session_state.user_message)
+        logger.info("user message: %s", user_message)
+
+        docs = self.vector_search(user_message, top_k=top_k) if top_k > 0 else None
+        context = "\n".join(doc.page_content for doc in docs) if docs else None
+        urls = [doc.metadata.get("url") for doc in docs] if docs else []
+        if context and len(context) > MAX_CONTEXT_TOKENS * 1.2:
+            context = context[: int(MAX_CONTEXT_TOKENS * 1.2)]
+
+        messages = self.build_messages(user_message, context)
+        options = self.build_options(
+            temperature, top_p, top_k_param, repeat_penalty, max_tokens
         )
-        fc = output.get("choices")[0].get("message").get("function_call")
-        funcname = fc.get("name")
-        arguments = json.loads(fc.get("arguments"))
-        logger.info(f"function calling: {fc}")
-        method = getattr(self, funcname)
-        info = method(**arguments)
-        logger.info(f"{funcname}: {info}")
+        logger.info("Ollama model: %s", model_name)
 
-        # モデルのプロンプトフォーマットに合わせてレスポンスを生成
-        prompt_format = self.get_prompt_format(model_name)
-        if prompt_format == "chatml":
-            new_prompt = f"""{prompt}<|im_end|>
-<|im_start|>system
-調べたところ、以下のような情報が得られました。
-================
-{info}
-================
-上記の情報を整理してユーザにわかりやすく伝えてください。<|im_end|>
-<|im_start|>assistant
-"""
-        elif prompt_format == "llama3":
-            new_prompt = f"""{prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>
+        try:
+            if use_function_calling:
+                assistant_message = self.client.chat(
+                    model=model_name,
+                    messages=messages,
+                    options=options,
+                    tools=self.build_tools(),
+                )
+                tool_calls = assistant_message.get("tool_calls") or []
+                if not tool_calls:
+                    text = assistant_message.get("content") or ""
+                    yield remove_thinking_tags(text) if hide_thinking else text
+                else:
+                    messages.append(assistant_message)
+                    for tool_call in tool_calls:
+                        function = tool_call.get("function", {})
+                        tool_name = function.get("name", "")
+                        arguments = function.get("arguments", {})
+                        try:
+                            result = self.run_tool(tool_name, arguments)
+                        except (ValueError, json.JSONDecodeError) as exc:
+                            result = f"ツールを実行できませんでした: {exc}"
+                        messages.append({"role": "tool", "content": result})
+                    for partial in self.client.stream_chat(
+                        model=model_name, messages=messages, options=options
+                    ):
+                        yield remove_thinking_tags(partial) if hide_thinking else partial
+            else:
+                for partial in self.client.stream_chat(
+                    model=model_name, messages=messages, options=options
+                ):
+                    yield remove_thinking_tags(partial) if hide_thinking else partial
+        except (OllamaClientError, requests.RequestException, ValueError) as exc:
+            logger.exception("Ollama response generation failed")
+            yield f"Ollamaへのリクエストに失敗しました: {exc}"
+        finally:
+            st.session_state.urls = urls
 
-調べたところ、以下のような情報が得られました。
-================
-{info}
-================
-上記の情報を整理してユーザにわかりやすく伝えてください。<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 
-"""
-        else:  # calm2
-            new_prompt = f"""{prompt}わかりました。
-USER: 調べたところ、以下のような情報が得られました。
-================
-{info}
-================
-上記の情報を整理してユーザにわかりやすく伝えてください。
-ASSISTANT: """
-        return new_prompt
-
-def main():
+def main() -> None:
     llm = LLM()
     st.title("Assistant Bot")
 
-    # サイドバーにモデルパラメータ調整UIを追加
+    try:
+        model_names = llm.client.list_models()
+    except OllamaClientError as exc:
+        st.error(
+            f"Ollamaに接続できません。OLLAMA_BASE_URL={OLLAMA_BASE_URL} を確認してください。"
+        )
+        st.code(str(exc))
+        st.stop()
+
+    if not model_names:
+        st.error(
+            "Ollamaにモデルがありません。.env の OLLAMA_INIT_MODELS を設定して "
+            "make launch を実行するか、ollama pull でモデルを取得してください。"
+        )
+        st.stop()
+
     with st.sidebar:
         st.header("モデルパラメータ設定")
-
         temperature = st.slider(
             "Temperature（温度）",
             min_value=0.0,
             max_value=2.0,
             value=0.7,
             step=0.1,
-            help="値が高いほど出力がランダムになります。創造的なタスクには高い値、決定論的なタスクには低い値を使用してください。"
+            help="値が高いほど出力がランダムになります。",
         )
-
         top_p = st.slider(
             "Top P",
             min_value=0.0,
             max_value=1.0,
             value=0.3,
             step=0.05,
-            help="nucleus samplingのパラメータ。値を低くすると、より確実性の高いトークンのみを選択します。"
+            help="nucleus samplingのパラメータです。",
         )
-
         top_k_param = st.slider(
             "Top K",
             min_value=1,
             max_value=100,
             value=20,
             step=1,
-            help="各ステップで考慮する上位Kトークンの数。値を低くすると出力の多様性が減ります。"
+            help="各ステップで考慮する上位Kトークンの数です。",
         )
-
         repeat_penalty = st.slider(
             "Repeat Penalty（繰り返しペナルティ）",
             min_value=1.0,
             max_value=2.0,
             value=1.1,
             step=0.05,
-            help="繰り返しを抑制するペナルティ。1.0は繰り返しペナルティなし。"
+            help="値を大きくすると繰り返しを抑制します。",
         )
-
         max_tokens = st.slider(
-            "Max Tokens（最大トークン数）",
+            "Max Tokens（最大生成トークン数）",
             min_value=256,
             max_value=4096,
             value=2048,
             step=256,
-            help="生成する最大トークン数。"
         )
 
     if st.button("Create index"):
@@ -462,90 +301,104 @@ def main():
             create_index()
 
     st.write("セッションをリセットする場合はページをリロードしてください")
-    top_k = st.number_input("参考情報", min_value=0, max_value=10, value="min", step=1)
+    top_k = st.number_input("参考情報", min_value=0, max_value=10, value=1, step=1)
+    model_name = st.selectbox("Select use model", model_names)
+    use_function_calling = st.checkbox(
+        "Function Callingで天気APIを利用する", value=False
+    )
+    hide_thinking = st.checkbox("思考タグ（think / thinking）を非表示にする", value=True)
 
-    model_name = st.selectbox("Select use model", MODEL_LIST.keys())
-
-    # initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = [
             {
                 "role": "assistant",
                 "content": "私はお助けBotです。何かお手伝いできることがあれば聞いてください。",
-                "timestamp": datetime.now()
+                "timestamp": datetime.now(),
             }
         ]
+    if "urls" not in st.session_state:
+        st.session_state.urls = []
 
-    # Custom CSS for timestamp styling
-    st.markdown("""
-    <style>
-    .timestamp {
-        font-size: 0.7em;
-        color: #888;
-        text-align: right;
-        margin-top: 0.5em;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        """
+        <style>
+        .timestamp {
+            font-size: 0.7em;
+            color: #888;
+            text-align: right;
+            margin-top: 0.5em;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    # display chat messages from history on app rerun
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-            # Display timestamp
-            timestamp_str = message.get("timestamp", datetime.now()).strftime("%Y-%m-%d %H:%M:%S")
-            latency_str = ""
-            if message["role"] == "assistant" and "latency" in message:
-                latency_str = f" (レイテンシー: {message['latency']:.2f}秒)"
-            st.markdown(f'<div class="timestamp">{timestamp_str}{latency_str}</div>', unsafe_allow_html=True)
+            timestamp = message.get("timestamp", datetime.now())
+            if not isinstance(timestamp, datetime):
+                timestamp = datetime.now()
+            latency = message.get("latency")
+            latency_text = f" (レイテンシー: {latency:.2f}秒)" if latency is not None else ""
+            st.markdown(
+                f'<div class="timestamp">{timestamp:%Y-%m-%d %H:%M:%S}{latency_text}</div>',
+                unsafe_allow_html=True,
+            )
 
-    # react to user input
     if prompt := st.chat_input("What is up?", key="user_message"):
-        # Record user message timestamp
         user_timestamp = datetime.now()
-        # display user message in chat message container
         with st.chat_message("user"):
             st.markdown(prompt)
-            st.markdown(f'<div class="timestamp">{user_timestamp.strftime("%Y-%m-%d %H:%M:%S")}</div>', unsafe_allow_html=True)
-        # add user message to chat history
-        st.session_state.messages.append({
-            "role": "user",
-            "content": prompt,
-            "timestamp": user_timestamp
-        })
-        # display assistant response in chat message container
+            st.markdown(
+                f'<div class="timestamp">{user_timestamp:%Y-%m-%d %H:%M:%S}</div>',
+                unsafe_allow_html=True,
+            )
+        st.session_state.messages.append(
+            {"role": "user", "content": prompt, "timestamp": user_timestamp}
+        )
+
         with st.chat_message("assistant"):
             with st.spinner("Assistant thinking..."):
                 placeholder = st.empty()
                 timestamp_placeholder = st.empty()
-                msg = "" # msgを空文字列で初期化
-                for msg in llm.on_input_change(
+                message_text = ""
+                for message_text in llm.on_input_change(
                     model_name=model_name,
                     top_k=top_k,
                     temperature=temperature,
                     top_p=top_p,
                     top_k_param=top_k_param,
                     repeat_penalty=repeat_penalty,
-                    max_tokens=max_tokens
+                    max_tokens=max_tokens,
+                    use_function_calling=use_function_calling,
+                    hide_thinking=hide_thinking,
                 ):
-                    placeholder.markdown(msg)
-                refs = []
-                for url in st.session_state.urls:
-                    refs.append(f"\n- {url}")
-                refs_msg = f"\n\n参考資料:{''.join(refs)}" if len(refs) > 0 else ""
-                placeholder.markdown(msg+refs_msg)
-                # Record assistant response timestamp and calculate latency
+                    placeholder.markdown(message_text)
+                reference_urls = [
+                    f"\n- {url}" for url in st.session_state.get("urls", []) if url
+                ]
+                references = (
+                    f"\n\n参考資料:{''.join(reference_urls)}" if reference_urls else ""
+                )
+                placeholder.markdown(message_text + references)
                 assistant_timestamp = datetime.now()
                 latency = (assistant_timestamp - user_timestamp).total_seconds()
-                timestamp_str = assistant_timestamp.strftime("%Y-%m-%d %H:%M:%S")
-                timestamp_placeholder.markdown(f'<div class="timestamp">{timestamp_str} (レイテンシー: {latency:.2f}秒)</div>', unsafe_allow_html=True)
-        # Add assistant response to chat history
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": msg+refs_msg,
-            "timestamp": assistant_timestamp,
-            "latency": latency
-        })
+                timestamp_placeholder.markdown(
+                    f'<div class="timestamp">{assistant_timestamp:%Y-%m-%d %H:%M:%S} '
+                    f'(レイテンシー: {latency:.2f}秒)</div>',
+                    unsafe_allow_html=True,
+                )
+
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": message_text + references,
+                "timestamp": assistant_timestamp,
+                "latency": latency,
+            }
+        )
+
 
 if __name__ == "__main__":
     main()
