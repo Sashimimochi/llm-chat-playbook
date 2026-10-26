@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import re
 from datetime import datetime
@@ -17,6 +16,7 @@ logger = getLogger(__file__)
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 MAX_CONTEXT_TOKENS = 4096
+MAX_TOOL_CALL_ROUNDS = 5
 DEFAULT_SYSTEM_PROMPT = (
     "あなたはユーザーの質問に答える日本語のAIアシスタントです。"
     "正確で分かりやすい回答をしてください。"
@@ -96,7 +96,10 @@ class LLM:
                 "type": "function",
                 "function": {
                     "name": "location_weather",
-                    "description": "日本の指定された地域の天気予報を取得します。",
+                    "description": (
+                        "日本の指定された地域の天気予報を取得します。"
+                        "ユーザーが天気について尋ねた場合に使用してください。"
+                    ),
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -160,13 +163,17 @@ class LLM:
     def run_tool(self, name: str, arguments: Any) -> str:
         if isinstance(arguments, str):
             arguments = json.loads(arguments)
-        if name != "location_weather":
-            raise ValueError(f"Unsupported tool: {name}")
         if not isinstance(arguments, dict) or not isinstance(
             arguments.get("location"), str
         ):
             raise ValueError("location_weather requires a string location.")
-        return self.location_weather(arguments["location"])
+
+        handlers = {"location_weather": self.location_weather}
+        try:
+            handler = handlers[name]
+        except KeyError as exc:
+            raise ValueError(f"Unsupported tool: {name}") from exc
+        return handler(arguments["location"])
 
     def on_input_change(
         self,
@@ -177,7 +184,6 @@ class LLM:
         top_k_param: int = 20,
         repeat_penalty: float = 1.1,
         max_tokens: int | None = None,
-        use_function_calling: bool = False,
         hide_thinking: bool = False,
     ):
         user_message = str(st.session_state.user_message)
@@ -193,40 +199,40 @@ class LLM:
         options = self.build_options(
             temperature, top_p, top_k_param, repeat_penalty, max_tokens
         )
+        tools = self.build_tools()
         logger.info("Ollama model: %s", model_name)
 
         try:
-            if use_function_calling:
-                assistant_message = self.client.chat(
+            for _ in range(MAX_TOOL_CALL_ROUNDS):
+                assistant_message = yield from self.client.stream_chat(
                     model=model_name,
                     messages=messages,
                     options=options,
-                    tools=self.build_tools(),
+                    tools=tools,
                 )
+                messages.append(assistant_message)
                 tool_calls = assistant_message.get("tool_calls") or []
                 if not tool_calls:
-                    text = assistant_message.get("content") or ""
-                    yield remove_thinking_tags(text) if hide_thinking else text
-                else:
-                    messages.append(assistant_message)
-                    for tool_call in tool_calls:
-                        function = tool_call.get("function", {})
-                        tool_name = function.get("name", "")
-                        arguments = function.get("arguments", {})
-                        try:
-                            result = self.run_tool(tool_name, arguments)
-                        except (ValueError, json.JSONDecodeError) as exc:
-                            result = f"ツールを実行できませんでした: {exc}"
-                        messages.append({"role": "tool", "content": result})
-                    for partial in self.client.stream_chat(
-                        model=model_name, messages=messages, options=options
-                    ):
-                        yield remove_thinking_tags(partial) if hide_thinking else partial
+                    break
+
+                for tool_call in tool_calls:
+                    function = tool_call.get("function", {})
+                    tool_name = function.get("name", "")
+                    arguments = function.get("arguments", {})
+                    try:
+                        result = self.run_tool(tool_name, arguments)
+                    except (ValueError, requests.RequestException) as exc:
+                        logger.warning("Tool call %s failed: %s", tool_name, exc)
+                        result = f"ツールを実行できませんでした: {exc}"
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_name": tool_name,
+                            "content": str(result),
+                        }
+                    )
             else:
-                for partial in self.client.stream_chat(
-                    model=model_name, messages=messages, options=options
-                ):
-                    yield remove_thinking_tags(partial) if hide_thinking else partial
+                yield f"ツール呼び出しが上限（{MAX_TOOL_CALL_ROUNDS}回）に達しました。質問を分けて再試行してください。"
         except (OllamaClientError, requests.RequestException, ValueError) as exc:
             logger.exception("Ollama response generation failed")
             yield f"Ollamaへのリクエストに失敗しました: {exc}"
@@ -303,9 +309,6 @@ def main() -> None:
     st.write("セッションをリセットする場合はページをリロードしてください")
     top_k = st.number_input("参考情報", min_value=0, max_value=10, value=1, step=1)
     model_name = st.selectbox("Select use model", model_names)
-    use_function_calling = st.checkbox(
-        "Function Callingで天気APIを利用する", value=False
-    )
     hide_thinking = st.checkbox("思考タグ（think / thinking）を非表示にする", value=True)
 
     if "messages" not in st.session_state:
@@ -371,7 +374,6 @@ def main() -> None:
                     top_k_param=top_k_param,
                     repeat_penalty=repeat_penalty,
                     max_tokens=max_tokens,
-                    use_function_calling=use_function_calling,
                     hide_thinking=hide_thinking,
                 ):
                     placeholder.markdown(message_text)

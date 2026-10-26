@@ -7,6 +7,15 @@ from unittest.mock import Mock, patch
 from utils.ollama_client import OllamaClient, OllamaClientError
 
 
+def consume_stream(generator):
+    chunks = []
+    while True:
+        try:
+            chunks.append(next(generator))
+        except StopIteration as stop:
+            return chunks, stop.value
+
+
 class OllamaClientTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = OllamaClient("http://ollama:11434")
@@ -28,47 +37,68 @@ class OllamaClientTests(unittest.TestCase):
         )
 
     @patch("utils.ollama_client.requests.post")
-    def test_chat_passes_options_and_tools(self, mocked_post: Mock) -> None:
-        response = Mock()
-        response.json.return_value = {
-            "message": {"role": "assistant", "content": "こんにちは"}
-        }
-        mocked_post.return_value = response
-        tools = [{"type": "function", "function": {"name": "location_weather"}}]
-        messages = [{"role": "user", "content": "東京の天気"}]
-
-        result = self.client.chat(
-            model="gemma4:e2b",
-            messages=messages,
-            options={"temperature": 0.7},
-            tools=tools,
-        )
-
-        self.assertEqual(result["content"], "こんにちは")
-        kwargs = mocked_post.call_args.kwargs
-        self.assertEqual(kwargs["json"]["messages"], messages)
-        self.assertEqual(kwargs["json"]["tools"], tools)
-        self.assertFalse(kwargs["json"]["stream"])
-
-    @patch("utils.ollama_client.requests.post")
-    def test_stream_chat_yields_cumulative_text(self, mocked_post: Mock) -> None:
+    def test_stream_chat_passes_tools_and_returns_message(
+        self, mocked_post: Mock
+    ) -> None:
         response = Mock()
         response.iter_lines.return_value = [
-            json.dumps({"message": {"content": "Hello"}}).encode(),
-            json.dumps({"message": {"content": " world"}}).encode(),
+            json.dumps({"message": {"role": "assistant", "content": "こんにちは"}}).encode(),
+            json.dumps({"message": {"role": "assistant", "content": "！"}}).encode(),
         ]
         mocked_post.return_value = response
+        tools = [{"type": "function", "function": {"name": "location_weather"}}]
+        messages = [{"role": "user", "content": "こんにちは"}]
 
-        result = list(
+        chunks, result = consume_stream(
             self.client.stream_chat(
                 model="gemma4:e2b",
-                messages=[{"role": "user", "content": "Hi"}],
-                options={},
+                messages=messages,
+                options={"temperature": 0.7},
+                tools=tools,
             )
         )
 
-        self.assertEqual(result, ["Hello", "Hello world"])
-        self.assertTrue(mocked_post.call_args.kwargs["stream"])
+        self.assertEqual(chunks, ["こんにちは", "こんにちは！"])
+        self.assertEqual(
+            result,
+            {"role": "assistant", "content": "こんにちは！"},
+        )
+        kwargs = mocked_post.call_args.kwargs
+        self.assertEqual(kwargs["json"]["messages"], messages)
+        self.assertEqual(kwargs["json"]["tools"], tools)
+        self.assertTrue(kwargs["json"]["stream"])
+        response.close.assert_called_once()
+
+    @patch("utils.ollama_client.requests.post")
+    def test_stream_chat_returns_tool_calls(self, mocked_post: Mock) -> None:
+        tool_calls = [
+            {
+                "function": {
+                    "name": "location_weather",
+                    "arguments": {"location": "東京"},
+                }
+            }
+        ]
+        response = Mock()
+        response.iter_lines.return_value = [
+            json.dumps(
+                {"message": {"role": "assistant", "content": "", "tool_calls": tool_calls}}
+            ).encode()
+        ]
+        mocked_post.return_value = response
+
+        chunks, result = consume_stream(
+            self.client.stream_chat(
+                model="gemma4:e2b",
+                messages=[{"role": "user", "content": "東京の天気"}],
+                options={},
+                tools=[{"type": "function"}],
+            )
+        )
+
+        self.assertEqual(chunks, [])
+        self.assertEqual(result["tool_calls"], tool_calls)
+        self.assertEqual(result["role"], "assistant")
         response.close.assert_called_once()
 
     @patch("utils.ollama_client.requests.get")
