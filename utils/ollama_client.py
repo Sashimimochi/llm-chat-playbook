@@ -59,7 +59,7 @@ class OllamaClient:
 
         response = None
         content = ""
-        tool_calls: list[dict[str, Any]] = []
+        tool_calls_by_index: dict[int, dict[str, Any]] = {}
         try:
             response = requests.post(
                 f"{self.base_url}/api/chat",
@@ -79,10 +79,24 @@ class OllamaClient:
 
                 message = chunk.get("message", {})
                 content += message.get("content") or ""
-                # Ollama emits the completed tool-call payload with the assistant
-                # message. Replace, rather than append, to avoid duplicate calls.
-                if message.get("tool_calls"):
-                    tool_calls = message["tool_calls"]
+                for position, call in enumerate(message.get("tool_calls") or []):
+                    index = call.get("index", position)
+                    saved_call = tool_calls_by_index.setdefault(
+                        index, {"function": {"arguments": {}}}
+                    )
+                    if call.get("id"):
+                        saved_call["id"] = call["id"]
+                    if call.get("type"):
+                        saved_call["type"] = call["type"]
+
+                    function = call.get("function") or {}
+                    saved_function = saved_call["function"]
+                    if function.get("name"):
+                        saved_function["name"] = function["name"]
+                    arguments = function.get("arguments")
+                    if isinstance(arguments, dict):
+                        saved_function["arguments"].update(arguments)
+
                 if message.get("content"):
                     yield content
         except (requests.RequestException, ValueError) as exc:
@@ -92,6 +106,8 @@ class OllamaClient:
                 response.close()
 
         final_message: dict[str, Any] = {"role": "assistant", "content": content}
-        if tool_calls:
-            final_message["tool_calls"] = tool_calls
+        if tool_calls_by_index:
+            final_message["tool_calls"] = [
+                tool_calls_by_index[index] for index in sorted(tool_calls_by_index)
+            ]
         return final_message

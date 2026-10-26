@@ -70,35 +70,46 @@ class OllamaClientTests(unittest.TestCase):
         response.close.assert_called_once()
 
     @patch("utils.ollama_client.requests.post")
-    def test_stream_chat_returns_tool_calls(self, mocked_post: Mock) -> None:
-        tool_calls = [
-            {
-                "function": {
-                    "name": "location_weather",
-                    "arguments": {"location": "東京"},
-                }
-            }
-        ]
+    def test_stream_chat_collects_multiple_tool_calls(self, mocked_post: Mock) -> None:
+        first_call = {
+            "index": 0,
+            "function": {
+                "name": "location_weather",
+                "arguments": {"location": "東京"},
+            },
+        }
+        second_call = {
+            "index": 1,
+            "function": {
+                "name": "location_weather",
+                "arguments": {"location": "横浜"},
+            },
+        }
         response = Mock()
         response.iter_lines.return_value = [
             json.dumps(
-                {"message": {"role": "assistant", "content": "", "tool_calls": tool_calls}}
-            ).encode()
+                {"message": {"role": "assistant", "content": "", "tool_calls": [first_call]}}
+            ).encode(),
+            json.dumps(
+                {"message": {"role": "assistant", "content": "", "tool_calls": [second_call]}}
+            ).encode(),
         ]
         mocked_post.return_value = response
 
         chunks, result = consume_stream(
             self.client.stream_chat(
                 model="gemma4:e2b",
-                messages=[{"role": "user", "content": "東京の天気"}],
+                messages=[{"role": "user", "content": "東京と横浜の天気"}],
                 options={},
                 tools=[{"type": "function"}],
             )
         )
 
         self.assertEqual(chunks, [])
-        self.assertEqual(result["tool_calls"], tool_calls)
-        self.assertEqual(result["role"], "assistant")
+        self.assertEqual(
+            result["tool_calls"],
+            [first_call, second_call],
+        )
         response.close.assert_called_once()
 
     @patch("utils.ollama_client.requests.get")
