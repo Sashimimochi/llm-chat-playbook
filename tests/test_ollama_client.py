@@ -72,15 +72,15 @@ class OllamaClientTests(unittest.TestCase):
     @patch("utils.ollama_client.requests.post")
     def test_stream_chat_collects_multiple_tool_calls(self, mocked_post: Mock) -> None:
         first_call = {
-            "index": 0,
             "function": {
+                "index": 0,
                 "name": "location_weather",
                 "arguments": {"location": "東京"},
             },
         }
         second_call = {
-            "index": 1,
             "function": {
+                "index": 1,
                 "name": "location_weather",
                 "arguments": {"location": "横浜"},
             },
