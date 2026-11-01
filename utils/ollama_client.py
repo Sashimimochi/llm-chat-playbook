@@ -80,7 +80,8 @@ class OllamaClient:
                 message = chunk.get("message", {})
                 content += message.get("content") or ""
                 for position, call in enumerate(message.get("tool_calls") or []):
-                    index = call.get("index", position)
+                    function = call.get("function") or {}
+                    index = function.get("index", position)
                     saved_call = tool_calls_by_index.setdefault(
                         index, {"function": {"arguments": {}}}
                     )
@@ -89,8 +90,8 @@ class OllamaClient:
                     if call.get("type"):
                         saved_call["type"] = call["type"]
 
-                    function = call.get("function") or {}
                     saved_function = saved_call["function"]
+                    saved_function["index"] = index
                     if function.get("name"):
                         saved_function["name"] = function["name"]
                     arguments = function.get("arguments")
