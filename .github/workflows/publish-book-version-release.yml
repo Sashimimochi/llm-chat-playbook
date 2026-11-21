@@ -4,12 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "書籍版タグ"
+        description: "2026年版のリリースタグ（例: v2.0.0）"
         required: true
-        type: choice
-        options:
-          - book-2024
-          - book-2026
+        type: string
       target_sha:
         description: "配布コードと照合済みのコミットSHA（40桁）"
         required: true
@@ -35,13 +32,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          case "$TAG_NAME" in
-            book-2024|book-2026) ;;
-            *)
-              echo "::error::Unsupported book tag: $TAG_NAME"
-              exit 1
-              ;;
-          esac
+          if ! [[ "$TAG_NAME" =~ ^v2\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::2026年版のタグは v2.x.y 形式で指定してください（例: v2.0.0）。"
+            exit 1
+          fi
 
           if ! [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::target_sha must be a full 40-character lowercase commit SHA."
@@ -74,11 +68,7 @@ jobs:
             fi
             echo "Tag already points to the requested commit; continuing only to create the missing release."
           else
-            case "$TAG_NAME" in
-              book-2024) tag_message="2024年版の配布コード" ;;
-              book-2026) tag_message="2026年版の配布コード" ;;
-            esac
-            git tag -a "$TAG_NAME" "$TARGET_SHA" -m "$tag_message"
+            git tag -a "$TAG_NAME" "$TARGET_SHA" -m "2026年版の書籍掲載コード"
             git push origin "$TAG_NAME"
           fi
 
@@ -90,16 +80,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          case "$TAG_NAME" in
-            book-2024)
-              release_title="2024年版 書籍掲載コード"
-              release_notes="2024年版の書籍掲載コードを固定したアーカイブです。\n\nSnapshot commit: $TARGET_SHA\n\nこのタグは書籍配布物との照合結果に基づいて作成されました。公開後にタグを付け替えないでください。"
-              ;;
-            book-2026)
-              release_title="2026年版 書籍掲載コード"
-              release_notes="2026年版の書籍掲載コードを固定したアーカイブです。\n\nSnapshot commit: $TARGET_SHA\n\n公開後にタグを付け替えないでください。"
-              ;;
-          esac
+          release_title="2026年版 書籍掲載コード ($TAG_NAME)"
+          release_notes="2026年版の書籍掲載コードを固定したアーカイブです。\n\nSnapshot commit: $TARGET_SHA\n\n公開後にタグを付け替えないでください。"
 
           gh release create "$TAG_NAME" \
             --verify-tag \
