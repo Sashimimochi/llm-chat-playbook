@@ -1,0 +1,15 @@
+services:
+  lmstudio:
+    image: lmstudio/llmster-preview:cpu
+    platform: linux/amd64
+    container_name: lmstudio
+    restart: unless-stopped
+    environment:
+      LMS_SERVER_HOST: 0.0.0.0
+    ports:
+      - "127.0.0.1:1234:1234"
+    volumes:
+      - lmstudio-data:/root/.lmstudio
+
+volumes:
+  lmstudio-data:

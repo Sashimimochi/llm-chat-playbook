@@ -1,4 +1,5 @@
-FROM ghcr.io/anomalyco/opencode:1.18.17
+ARG OPENCODE_VERSION=2.3.2
+FROM ghcr.io/anomalyco/opencode:${OPENCODE_VERSION}
 
 USER root
 
