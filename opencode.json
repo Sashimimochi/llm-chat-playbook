@@ -9,6 +9,10 @@
       "options": {
         "baseURL": "http://ollama:11434/v1"
       },
+      "settings": {
+        "headerTimeout": 60000,
+        "chunkTimeout": false
+      },
       "models": {
         "gemma4:e2b": {
           "name": "Gemma4 2B",
